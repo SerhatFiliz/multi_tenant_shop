@@ -14,9 +14,13 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+# multi_tenant_shop/urls.py
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include # Make sure to import 'include'
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # This line tells Django: "For any URL that isn't 'admin/',
+    # go look for more instructions in the 'store.urls' file."
+    path('', include('store.urls')),
 ]

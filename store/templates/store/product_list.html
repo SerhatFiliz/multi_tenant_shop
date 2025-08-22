@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">Tüm Ürünler</h1>
+<div class="row">
+    {% for variant in variants %}
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-secondary" style="height: 200px;"></div>
+            <div class="card-body">
+                <h5 class="card-title">{{ variant.product.name }}</h5>
+                <h6 class="card-subtitle mb-2 text-muted">{{ variant.color }} {{ variant.size }}</h6>
+                <p class="card-text fw-bold fs-5">{{ variant.sale_price }} TL</p>
+                <a href="#" class="btn btn-primary">Sepete Ekle</a>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col">
+        <p>Gösterilecek ürün bulunamadı.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock content %}

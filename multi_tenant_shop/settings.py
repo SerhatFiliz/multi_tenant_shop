@@ -89,7 +89,7 @@ ROOT_URLCONF = 'multi_tenant_shop.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -133,6 +133,7 @@ USE_TZ = True
 
 # --- STATIC FILES ---
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # --- DEFAULT PRIMARY KEY ---
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -150,3 +151,4 @@ TENANT_MODEL = "store.Tenant"
 TENANT_DOMAIN_MODEL = "store.Domain"
 
 AUTH_USER_MODEL = 'store.User'
+
