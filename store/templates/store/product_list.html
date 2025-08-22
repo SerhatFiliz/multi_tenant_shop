@@ -5,15 +5,16 @@
 <div class="row">
     {% for variant in variants %}
     <div class="col-md-4 mb-4">
-        <div class="card h-100">
-            <div class="card-header bg-secondary" style="height: 200px;"></div>
-            <div class="card-body">
-                <h5 class="card-title">{{ variant.product.name }}</h5>
-                <h6 class="card-subtitle mb-2 text-muted">{{ variant.color }} {{ variant.size }}</h6>
-                <p class="card-text fw-bold fs-5">{{ variant.sale_price }} TL</p>
-                <a href="#" class="btn btn-primary">Sepete Ekle</a>
+        <a href="{% url 'product_detail' slug=variant.product.slug %}" class="text-decoration-none text-dark">
+            <div class="card h-100">
+                <div class="card-header bg-secondary" style="height: 200px;"></div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ variant.product.name }}</h5>
+                    <h6 class="card-subtitle mb-2 text-muted">{{ variant.color }} {{ variant.size }}</h6>
+                    <p class="card-text fw-bold fs-5">{{ variant.sale_price }} TL</p>
+                </div>
             </div>
-        </div>
+        </a>
     </div>
     {% empty %}
     <div class="col">

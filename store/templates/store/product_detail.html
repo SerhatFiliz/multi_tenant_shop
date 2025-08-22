@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="border rounded d-flex align-items-center justify-content-center" style="height: 450px; background-color: #f8f9fa;">
+                <span class="text-muted">Resim</span>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <h1>{{ product.name }}</h1>
+            <p class="text-muted">{{ product.category.name }}</p>
+            <p>{{ product.description }}</p>
+
+            <hr>
+
+            <h3 id="variant-price" class="mb-3">{{ variants.first.sale_price|stringformat:".2f" }} TL</h3>
+            <p class="mb-1"><strong>SKU:</strong> <span id="variant-sku">{{ variants.first.sku }}</span></p>
+            <p><strong>Stok Durumu:</strong> <span id="variant-stock">{{ variants.first.stock_quantity }}</span> adet</p>
+
+            <div class="my-4">
+                <label class="form-label fw-bold">Renk Seçimi:</label>
+                <div class="d-flex">
+                    {% for variant in variants %}
+                    <div class="form-check me-4">
+                        <input class="form-check-input variant-selector" type="radio" name="variant_option" 
+                               id="variant-{{ variant.id }}" value="{{ variant.id }}" {% if forloop.first %}checked{% endif %}>
+                        <label class="form-check-label" for="variant-{{ variant.id }}">
+                            {{ variant.color }}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <button class="btn btn-primary btn-lg w-100">Sepete Ekle</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Wait for the entire HTML document to be fully loaded before running the script.
+    document.addEventListener('DOMContentLoaded', function () {
+        
+        // 1. Get the data prepared by Django. The 'json_script' filter safely
+        //    converts our Python list into a JavaScript array.
+        const variantsDataElement = document.getElementById('variants-data');
+        if (!variantsDataElement) {
+            console.error("Critical Error: Variants data script tag not found!");
+            return; // Stop the script if data is missing
+        }
+        const variantsData = JSON.parse(variantsDataElement.textContent);
+
+        // 2. Get references to the HTML elements we want to dynamically update.
+        const priceElement = document.getElementById('variant-price');
+        const skuElement = document.getElementById('variant-sku');
+        const stockElement = document.getElementById('variant-stock');
+
+        // 3. Find all the radio buttons used for selecting a variant.
+        const variantSelectors = document.querySelectorAll('.variant-selector');
+
+        // This function updates the displayed info based on the selected variant ID.
+        function updateVariantInfo(selectedVariantId) {
+            const selectedVariant = variantsData.find(variant => variant.id === selectedVariantId);
+
+            if (selectedVariant) {
+                // Update the elements only if they were found in the HTML.
+                if (priceElement) {
+                    priceElement.textContent = parseFloat(selectedVariant.sale_price).toFixed(2) + ' TL';
+                }
+                if (skuElement) {
+                    skuElement.textContent = selectedVariant.sku;
+                }
+                if (stockElement) {
+                    stockElement.textContent = selectedVariant.stock_quantity + ' adet';
+                }
+            } else {
+                console.error("Error: Could not find data for selected variant ID:", selectedVariantId);
+            }
+        }
+
+        // 4. Add a 'change' event listener to each radio button.
+        variantSelectors.forEach(selector => {
+            selector.addEventListener('change', function() {
+                const selectedId = parseInt(this.value);
+                updateVariantInfo(selectedId);
+            });
+        });
+    });
+</script>
+
+{{ variants_data_for_js|json_script:"variants-data" }}
+
+{% endblock content %}
