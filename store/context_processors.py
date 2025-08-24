@@ -1,4 +1,5 @@
 # store/context_processors.py
+from .cart import Cart
 
 def tenant_context(request):
     """
@@ -8,5 +9,7 @@ def tenant_context(request):
     to the incoming 'request' object. We are just extracting it here.
     """
     return {
-        'current_tenant': request.tenant
+        'current_tenant': request.tenant,
+        'cart': Cart(request)
     }
+

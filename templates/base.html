@@ -15,7 +15,10 @@
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <li class="nav-item">
-                        <a class="nav-link" href="/products">Ürünler</a>
+                        <a class="nav-link" href="{% url 'store:product_list' %}">Ürünler</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'store:cart_detail' %}">Sepet ({{ cart|length }})</a>
                     </li>
                 </ul>
             </div>

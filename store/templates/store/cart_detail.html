@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">Alışveriş Sepetiniz</h1>
+
+    {% if cart %}
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th scope="col">Ürün</th>
+                    <th scope="col" style="width: 150px;">Adet</th>
+                    <th scope="col" class="text-end">Birim Fiyat</th>
+                    <th scope="col" class="text-end">Toplam Fiyat</th>
+                    <th scope="col" style="width: 100px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in cart %}
+                <tr>
+                    <td>
+                        {{ item.variant.product.name }}
+                        <br>
+                        <small class="text-muted">{{ item.variant.color }} {{ item.variant.size }}</small>
+                    </td>
+                    <td>
+                        <form action="{% url 'store:cart_update' item.variant.id %}" method="post" class="d-flex">
+                            {% csrf_token %}
+                            <input type="number" name="quantity" value="{{ item.quantity }}" 
+                                   class="form-control form-control-sm" min="1" max="100">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary ms-2">✓</button>
+                        </form>
+                    </td>
+                    <td class="text-end">{{ item.price }} TL</td>
+                    <td class="text-end">{{ item.total_price }} TL</td>
+                    <td class="text-center">
+                        <form action="{% url 'store:cart_remove' item.variant.id %}" method="post">
+                             {% csrf_token %}
+                             <button type="submit" class="btn btn-sm btn-outline-danger">Sil</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                <tr class="table-light">
+                    <td colspan="4" class="text-end"><strong>Genel Toplam</strong></td>
+                    <td class="text-end"><strong>{{ cart.get_total_price }} TL</strong></td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="text-end mt-4">
+        <a href="{% url 'store:product_list' %}" class="btn btn-secondary">Alışverişe Devam Et</a>
+        <a href="#" class="btn btn-primary">Ödemeye Geç</a>
+    </div>
+    {% else %}
+    <div class="alert alert-info" role="alert">
+        Sepetinizde henüz ürün bulunmamaktadır.
+    </div>
+    {% endif %}
+</div>
+{% endblock content %}

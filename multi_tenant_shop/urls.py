@@ -20,7 +20,9 @@ from django.urls import path, include # Make sure to import 'include'
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # This line tells Django: "For any URL that isn't 'admin/',
-    # go look for more instructions in the 'store.urls' file."
-    path('', include('store.urls')),
+    # By adding the namespace parameter, we are telling the main URL router
+    # that all URLs included from 'store.urls' belong to the 'store' namespace.
+    # This allows us to use {% url 'store:cart_detail' %} in our templates.
+    path('', include('store.urls', namespace='store')),
+    
 ]

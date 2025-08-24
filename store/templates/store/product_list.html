@@ -5,7 +5,7 @@
 <div class="row">
     {% for variant in variants %}
     <div class="col-md-4 mb-4">
-        <a href="{% url 'product_detail' slug=variant.product.slug %}" class="text-decoration-none text-dark">
+        <a href="{% url 'store:product_detail' slug=variant.product.slug %}" class="text-decoration-none text-dark">
             <div class="card h-100">
                 <div class="card-header bg-secondary" style="height: 200px;"></div>
                 <div class="card-body">

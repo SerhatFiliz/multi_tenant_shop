@@ -2,6 +2,10 @@
 from django.views.generic import TemplateView, ListView, DetailView # Add DetailView
 from .models import Product, ProductVariant # Add Product
 
+from django.shortcuts import render, redirect, get_object_or_404
+from django.views.decorators.http import require_POST
+from .cart import Cart
+
 # We use Class-Based Views (CBVs) as they are a professional and reusable way
 # to structure view logic.
 
@@ -49,3 +53,47 @@ class ProductDetailView(DetailView):
         context['variants_data_for_js'] = variants_data_for_js
         
         return context
+    
+@require_POST
+def cart_add(request, variant_id):
+    """
+    A view to add a product variant to the cart.
+    """
+    cart = Cart(request)
+    variant = get_object_or_404(ProductVariant, id=variant_id)
+    # For simplicity, we add quantity 1 for now. We will enhance this later.
+    cart.add(variant=variant, quantity=1)
+    return redirect('store:cart_detail') # Redirect to the cart detail page
+
+def cart_detail(request):
+    """
+    A view to display the cart contents.
+    """
+    cart = Cart(request)
+    return render(request, 'store/cart_detail.html', {'cart': cart})
+
+def cart_remove(request, variant_id):
+    """
+    A view to remove an item from the cart.
+    """
+    cart = Cart(request)
+    variant = get_object_or_404(ProductVariant, id=variant_id)
+    cart.remove(variant)
+    return redirect('store:cart_detail')
+
+
+@require_POST
+def cart_update(request, variant_id):
+    """
+    A view to update the quantity of a specific item in the cart.
+    """
+    cart = Cart(request)
+    variant = get_object_or_404(ProductVariant, id=variant_id)
+    quantity = request.POST.get('quantity')
+
+    if quantity and quantity.isdigit():
+        cart.add(variant=variant, 
+                 quantity=int(quantity), 
+                 override_quantity=True) # override_quantity=True replaces the old quantity with the new one.
+        
+    return redirect('store:cart_detail')

@@ -153,3 +153,4 @@ TENANT_DOMAIN_MODEL = "store.Domain"
 
 AUTH_USER_MODEL = 'store.User'
 
+CART_SESSION_ID = 'cart'

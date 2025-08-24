@@ -20,45 +20,57 @@
             <p class="mb-1"><strong>SKU:</strong> <span id="variant-sku">{{ variants.first.sku }}</span></p>
             <p><strong>Stok Durumu:</strong> <span id="variant-stock">{{ variants.first.stock_quantity }}</span> adet</p>
 
-            <div class="my-4">
-                <label class="form-label fw-bold">Renk Seçimi:</label>
-                <div class="d-flex">
-                    {% for variant in variants %}
-                    <div class="form-check me-4">
-                        <input class="form-check-input variant-selector" type="radio" name="variant_option" 
-                               id="variant-{{ variant.id }}" value="{{ variant.id }}" {% if forloop.first %}checked{% endif %}>
-                        <label class="form-check-label" for="variant-{{ variant.id }}">
-                            {{ variant.color }}
-                        </label>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
+            <form action="{% url 'store:cart_add' variant_id=variants.first.id %}" method="post" id="add-to-cart-form">
+                
+                {% csrf_token %}
 
-            <button class="btn btn-primary btn-lg w-100">Sepete Ekle</button>
+                <div class="my-4">
+                    <label class="form-label fw-bold">Renk Seçimi:</label>
+                    <div class="d-flex">
+                        {% for variant in variants %}
+                        <div class="form-check me-4">
+                            <input class="form-check-input variant-selector" type="radio" name="variant_option" 
+                                   id="variant-{{ variant.id }}" value="{{ variant.id }}" {% if forloop.first %}checked{% endif %}>
+                            <label class="form-check-label" for="variant-{{ variant.id }}">
+                                {{ variant.color }}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-lg w-100">Sepete Ekle</button>
+            </form>
         </div>
     </div>
 </div>
 
 <script>
-    // Wait for the entire HTML document to be fully loaded before running the script.
+    document.querySelectorAll('.variant-selector').forEach(selector => {
+        selector.addEventListener('change', function() {
+            const selectedId = this.value;
+            const form = document.getElementById('add-to-cart-form');
+            // This is the base URL structure from Django's url template tag. We will replace '0' with the selected ID.
+            const baseUrl = "{% url 'store:cart_add' variant_id=0 %}";
+            form.action = baseUrl.replace('/0/', '/' + selectedId + '/');
+        });
+    });
+</script>
+
+<script>
+    // Wait for the entire HTML document to be fully loaded before trying to run the script.
     document.addEventListener('DOMContentLoaded', function () {
         
-        // 1. Get the data prepared by Django. The 'json_script' filter safely
-        //    converts our Python list into a JavaScript array.
         const variantsDataElement = document.getElementById('variants-data');
         if (!variantsDataElement) {
             console.error("Critical Error: Variants data script tag not found!");
-            return; // Stop the script if data is missing
+            return; // Stop the script if data is missing.
         }
         const variantsData = JSON.parse(variantsDataElement.textContent);
 
-        // 2. Get references to the HTML elements we want to dynamically update.
         const priceElement = document.getElementById('variant-price');
         const skuElement = document.getElementById('variant-sku');
         const stockElement = document.getElementById('variant-stock');
-
-        // 3. Find all the radio buttons used for selecting a variant.
         const variantSelectors = document.querySelectorAll('.variant-selector');
 
         // This function updates the displayed info based on the selected variant ID.
@@ -66,7 +78,6 @@
             const selectedVariant = variantsData.find(variant => variant.id === selectedVariantId);
 
             if (selectedVariant) {
-                // Update the elements only if they were found in the HTML.
                 if (priceElement) {
                     priceElement.textContent = parseFloat(selectedVariant.sale_price).toFixed(2) + ' TL';
                 }
@@ -76,12 +87,10 @@
                 if (stockElement) {
                     stockElement.textContent = selectedVariant.stock_quantity + ' adet';
                 }
-            } else {
-                console.error("Error: Could not find data for selected variant ID:", selectedVariantId);
             }
         }
 
-        // 4. Add a 'change' event listener to each radio button.
+        // Add a 'change' event listener to each radio button to trigger the update.
         variantSelectors.forEach(selector => {
             selector.addEventListener('change', function() {
                 const selectedId = parseInt(this.value);

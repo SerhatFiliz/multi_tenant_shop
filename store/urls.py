@@ -2,12 +2,18 @@
 from django.urls import path
 from . import views
 
-# We are adding a new URL pattern for the product detail page.
+app_name = 'store'
+
 urlpatterns = [
     path('', views.HomePageView.as_view(), name='home'),
     path('products/', views.ProductListView.as_view(), name='product_list'),
-    # This is a dynamic URL.
-    # <slug:slug> tells Django: "Expect a URL-friendly string here,
-    # capture it, and pass it to the view as a variable named 'slug'."
     path('product/<slug:slug>/', views.ProductDetailView.as_view(), name='product_detail'),
+    
+    # Cart URLs
+    path('cart/', views.cart_detail, name='cart_detail'),
+    path('cart/add/<int:variant_id>/', views.cart_add, name='cart_add'),
+    
+    # --- ADD THESE TWO NEW URLS ---
+    path('cart/remove/<int:variant_id>/', views.cart_remove, name='cart_remove'),
+    path('cart/update/<int:variant_id>/', views.cart_update, name='cart_update'),
 ]
