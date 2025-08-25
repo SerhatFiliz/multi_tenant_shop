@@ -16,4 +16,6 @@ urlpatterns = [
     # --- ADD THESE TWO NEW URLS ---
     path('cart/remove/<int:variant_id>/', views.cart_remove, name='cart_remove'),
     path('cart/update/<int:variant_id>/', views.cart_update, name='cart_update'),
+
+    path('checkout/', views.checkout, name='checkout'),
 ]

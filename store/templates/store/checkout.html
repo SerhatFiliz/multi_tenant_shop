@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">Checkout Information</h1>
+    <div class="row">
+        <div class="col-md-7">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title">Shipping Address</h4>
+                    <form action="." method="post">
+                        {{ form.as_p }}
+
+                        {% csrf_token %}
+
+                        <button type="submit" class="btn btn-primary w-100 mt-3">Complete Order</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-5">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title">Order Summary</h4>
+                    <ul class="list-group list-group-flush">
+                        {% for item in cart %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="my-0">{{ item.variant.product.name }}</h6>
+                                <small class="text-muted">{{ item.variant.color }} x {{ item.quantity }}</small>
+                            </div>
+                            <span class="text-muted">{{ item.total_price }} TL</span>
+                        </li>
+                        {% endfor %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Total (TL)</span>
+                            <strong>{{ cart.get_total_price }} TL</strong>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

@@ -1,11 +1,12 @@
 # store/views.py
-from django.views.generic import TemplateView, ListView, DetailView # Add DetailView
-from .models import Product, ProductVariant # Add Product
+from django.views.generic import TemplateView, ListView, DetailView 
+from .models import Product, ProductVariant, Order, OrderItem 
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from .cart import Cart
 
+from .forms import OrderCreateForm
 # We use Class-Based Views (CBVs) as they are a professional and reusable way
 # to structure view logic.
 
@@ -97,3 +98,59 @@ def cart_update(request, variant_id):
                  override_quantity=True) # override_quantity=True replaces the old quantity with the new one.
         
     return redirect('store:cart_detail')
+
+# This view will handle both displaying the checkout form (GET request)
+# and processing the submitted form data (POST request).
+def checkout(request):
+    # Get the user's current cart from the session.
+    cart = Cart(request)
+
+    # Check if the form has been submitted using the POST method.
+    if request.method == 'POST':
+        # Create a form instance and populate it with data from the request (binding).
+        form = OrderCreateForm(request.POST)
+
+        # Check if the form's data is valid according to our model's rules.
+        if form.is_valid():
+            # The form is valid. First, create the Address object in memory.
+            # 'commit=False' prevents the form from saving to the DB immediately.
+            # This allows us to modify the object before the final save.
+            address = form.save(commit=False)
+
+            # Check if the user is authenticated (logged in).
+            if request.user.is_authenticated:
+                # If logged in, associate this new address with the current user.
+                address.user = request.user
+
+            # Now, save the address to the database (either with or without a user).
+            address.save()
+
+            # Create a new Order record in the database.
+            order = Order.objects.create(
+                user=request.user if request.user.is_authenticated else None,
+                shipping_address=address, # Link the order to the address we just saved.
+                total_amount=cart.get_total_price() # Get the total from our cart object.
+            )
+
+            # Loop through every item currently in the cart.
+            for item in cart:
+                # For each item, create a corresponding OrderItem record in the database.
+                OrderItem.objects.create(
+                    order=order, # Link it to the order we just created.
+                    product_variant=item['variant'],
+                    price=item['price'], # Store the price at the time of purchase.
+                    quantity=item['quantity']
+                )
+
+            # The order is successfully created, so clear the cart from the session.
+            cart.clear()
+
+            # Redirect the user to a success page (for now, we'll use the homepage).
+            # Later, we can create a dedicated "Thank You" page.
+            return redirect('store:home') 
+    else:
+        # If it's a GET request (the user is just visiting the page), create a blank form instance.
+        form = OrderCreateForm()
+
+    # Render the checkout template, passing the cart (for the summary) and the form.
+    return render(request, 'store/checkout.html', {'cart': cart, 'form': form})
