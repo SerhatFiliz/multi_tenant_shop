@@ -78,6 +78,9 @@ TENANT_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Any other tenant-specific apps will be added here.
+
+    'django_filters',
+    'django_elasticsearch_dsl',
 ]
 
 # The final INSTALLED_APPS is a combination of both lists.
@@ -161,3 +164,12 @@ CART_SESSION_ID = 'cart'
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+# ==============================================================================
+# ELASTICSEARCH CONFIGURATION
+# ==============================================================================
+ELASTICSEARCH_DSL = {
+    'default': {
+        'hosts': f"http://{os.getenv('ELASTICSEARCH_HOST')}:9200",
+    },
+}
