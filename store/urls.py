@@ -29,4 +29,7 @@ urlpatterns = [
 
     # URL for the user profile page.
     path('profile/', views.profile, name='profile'),
+
+    # URL for submitting a review for a specific product.
+    path('product/<slug:slug>/review/', views.submit_review, name='submit_review'),
 ]

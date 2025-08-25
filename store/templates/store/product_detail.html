@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load crispy_forms_tags %}
 
 {% block content %}
 <div class="container mt-5">
@@ -101,5 +102,41 @@
 </script>
 
 {{ variants_data_for_js|json_script:"variants-data" }}
+
+<div class="row mt-5">
+    <div class="col-12">
+        <hr>
+        <h3 class="mb-4">Ürün Değerlendirmeleri</h3>
+
+        {% if user.is_authenticated and has_purchased %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Yorumunuzu Paylaşın</h5>
+                    <form action="{% url 'store:submit_review' slug=product.slug %}" method="post">
+                        {% csrf_token %}
+                        {{ review_form|crispy }}
+                        <button type="submit" class="btn btn-success mt-2">Yorumu Gönder</button>
+                    </form>
+                </div>
+            </div>
+        {% elif user.is_authenticated and not has_purchased %}
+            <p class="text-muted">Bu ürüne yorum yapmak için önce satın almalısınız.</p>
+        {% else %}
+             <p><a href="{% url 'store:login' %}?next={{ request.path }}">Yorum yapmak için giriş yapın.</a></p>
+        {% endif %}
+
+        {% for review in reviews %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h6 class="card-title">{{ review.user.get_full_name|default:review.user.username }}</h6>
+                    <p class="card-subtitle mb-2 text-muted">Puan: {{ review.rating }}/5 - <small>{{ review.created_at|date:"d F Y" }}</small></p>
+                    <p class="card-text">{{ review.comment }}</p>
+                </div>
+            </div>
+        {% empty %}
+            <p>Bu ürün için henüz hiç yorum yapılmamış. İlk yorumu siz yapın!</p>
+        {% endfor %}
+    </div>
+</div>
 
 {% endblock content %}

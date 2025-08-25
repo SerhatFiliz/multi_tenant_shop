@@ -2,7 +2,7 @@
 
 # Import the forms module from Django and our Address model.
 from django import forms
-from .models import Address, User
+from .models import Address, User, Review
 from django.contrib.auth.forms import UserCreationForm
 
 # We are creating a ModelForm. This special type of form is automatically
@@ -45,3 +45,25 @@ class CustomUserCreationForm(UserCreationForm):
         model = User
         # Specify the fields to display on the registration form
         fields = ('username', 'email', 'first_name', 'last_name')
+
+
+class ReviewForm(forms.ModelForm):
+    # We create a custom field for the rating using a ChoiceField with a Select widget.
+    # This will render as a dropdown menu (1, 2, 3, 4, 5).
+    rating = forms.ChoiceField(
+        choices=[(i, i) for i in range(1, 6)],
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    
+    class Meta:
+        model = Review
+        # We only want the user to input the rating and their comment.
+        # 'product' and 'user' will be set automatically in the view.
+        fields = ['rating', 'comment']
+        widgets = {
+            'comment': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+        }
+        labels = {
+            'rating': 'Puanınız',
+            'comment': 'Yorumunuz',
+        }

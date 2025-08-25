@@ -1,6 +1,6 @@
 # store/views.py
 from django.views.generic import TemplateView, ListView, DetailView 
-from .models import Product, ProductVariant, Order, OrderItem 
+from .models import Product, ProductVariant, Order, OrderItem, Review
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
@@ -8,7 +8,7 @@ from .cart import Cart
 
 from .forms import OrderCreateForm
 
-from .forms import OrderCreateForm, CustomUserCreationForm
+from .forms import OrderCreateForm, CustomUserCreationForm, ReviewForm
 from django.contrib.auth import login
 
 from django.contrib.auth.decorators import login_required
@@ -41,24 +41,35 @@ class ProductListView(ListView):
 class ProductDetailView(DetailView):
     model = Product
     template_name = 'store/product_detail.html'
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         product = self.get_object()
         variants_queryset = product.variants.filter(is_active=True)
         context['variants'] = variants_queryset
-        
-        # This part is crucial. It prepares a simple list for JavaScript.
+
         variants_data_for_js = list(variants_queryset.values(
-            'id', 
-            'sku', 
-            'sale_price', 
-            'stock_quantity', 
-            'color', 
-            'size'
+            'id', 'sku', 'sale_price', 'stock_quantity', 'color', 'size'
         ))
         context['variants_data_for_js'] = variants_data_for_js
-        
+
+        # --- ADD THIS NEW LOGIC ---
+        # Get all reviews for the current product.
+        context['reviews'] = product.reviews.all().order_by('-created_at')
+        # Create an instance of the review form to display on the page.
+        context['review_form'] = ReviewForm()
+
+        # Check if the current user (if logged in) has purchased this product.
+        has_purchased = False
+        if self.request.user.is_authenticated:
+            has_purchased = Order.objects.filter(
+                user=self.request.user,
+                status__in=['delivered', 'shipped'],
+                items__product_variant__product=product
+            ).exists()
+        context['has_purchased'] = has_purchased
+        # --- END OF NEW LOGIC ---
+
         return context
     
 @require_POST
@@ -189,3 +200,40 @@ def profile(request):
     
     # Render the profile template, passing the list of orders to it.
     return render(request, 'store/profile.html', {'orders': orders})
+
+@login_required # Only logged-in users can submit reviews.
+def submit_review(request, slug):
+    # Find the product that the user is trying to review.
+    product = get_object_or_404(Product, slug=slug)
+    
+    # --- CRITICAL LOGIC: Check if the user has purchased this product ---
+    # We check if there is any completed order ('delivered' or 'shipped')
+    # for the current user that contains this specific product.
+    has_purchased = Order.objects.filter(
+        user=request.user,
+        status__in=['delivered', 'shipped'], # Check against multiple statuses
+        items__product_variant__product=product
+    ).exists()
+
+    if not has_purchased:
+        # If the user has not purchased the item, redirect them back.
+        # We should add a Django message here later to inform the user.
+        return redirect('store:product_detail', slug=slug)
+
+    if request.method == 'POST':
+        form = ReviewForm(request.POST)
+        if form.is_valid():
+            # Create the review object in memory.
+            review = form.save(commit=False)
+            # Assign the current product and user to the review.
+            review.product = product
+            review.user = request.user
+            # Save the complete review object to the database.
+            review.save()
+            # Redirect back to the product detail page to see the new review.
+            return redirect('store:product_detail', slug=slug)
+    else:
+        form = ReviewForm()
+
+    # Pass the purchase status to the template to conditionally show the form.
+    return render(request, 'store/product_detail.html', {'form': form, 'product': product, 'has_purchased': has_purchased})
