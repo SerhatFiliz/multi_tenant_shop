@@ -26,4 +26,7 @@ urlpatterns = [
     path('login/', auth_views.LoginView.as_view(template_name='store/login.html'), name='login'),
     # Django's built-in LogoutView. It handles logout and redirects to the homepage.
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+
+    # URL for the user profile page.
+    path('profile/', views.profile, name='profile'),
 ]

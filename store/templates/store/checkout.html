@@ -1,19 +1,16 @@
 {% extends "base.html" %}
-
-{% block content %}
+{% load crispy_forms_tags %} {% block content %}
 <div class="container mt-5">
-    <h1 class="mb-4">Checkout Information</h1>
+    <h1 class="mb-4">Ödeme Bilgileri</h1>
     <div class="row">
         <div class="col-md-7">
             <div class="card">
                 <div class="card-body">
-                    <h4 class="card-title">Shipping Address</h4>
+                    <h4 class="card-title">Teslimat Adresi</h4>
                     <form action="." method="post">
-                        {{ form.as_p }}
-
                         {% csrf_token %}
-
-                        <button type="submit" class="btn btn-primary w-100 mt-3">Complete Order</button>
+                        {{ form|crispy }}
+                        <button type="submit" class="btn btn-primary w-100 mt-3">Siparişi Tamamla</button>
                     </form>
                 </div>
             </div>
@@ -21,7 +18,7 @@
         <div class="col-md-5">
             <div class="card">
                 <div class="card-body">
-                    <h4 class="card-title">Order Summary</h4>
+                    <h4 class="card-title">Sipariş Özeti</h4>
                     <ul class="list-group list-group-flush">
                         {% for item in cart %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -33,7 +30,7 @@
                         </li>
                         {% endfor %}
                         <li class="list-group-item d-flex justify-content-between">
-                            <span>Total (TL)</span>
+                            <span>Toplam (TL)</span>
                             <strong>{{ cart.get_total_price }} TL</strong>
                         </li>
                     </ul>

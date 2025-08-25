@@ -39,7 +39,7 @@
                            Hesabım ({{ user.username }})
                         </a>
                         <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navbarDropdown">
-                            <li><a class="dropdown-item" href="#">Siparişlerim</a></li>
+                            <li><a class="dropdown-item" href="{% url 'store:profile' %}">Siparişlerim</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{% url 'store:logout' %}">Çıkış Yap</a></li>
                         </ul>

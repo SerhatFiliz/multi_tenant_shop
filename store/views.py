@@ -11,6 +11,8 @@ from .forms import OrderCreateForm
 from .forms import OrderCreateForm, CustomUserCreationForm
 from django.contrib.auth import login
 
+from django.contrib.auth.decorators import login_required
+
 # We use Class-Based Views (CBVs) as they are a professional and reusable way
 # to structure view logic.
 
@@ -175,3 +177,15 @@ def signup(request):
         form = CustomUserCreationForm()
 
     return render(request, 'store/signup.html', {'form': form})
+
+# The @login_required decorator is a security feature from Django.
+# It ensures that only logged-in users can access this view.
+# If an anonymous user tries to access it, they will be redirected to the login page.
+@login_required
+def profile(request):
+    # Filter the Order model to get only the orders that belong to the current user.
+    # order_by('-order_date') sorts the orders from newest to oldest.
+    orders = Order.objects.filter(user=request.user).order_by('-order_date')
+    
+    # Render the profile template, passing the list of orders to it.
+    return render(request, 'store/profile.html', {'orders': orders})

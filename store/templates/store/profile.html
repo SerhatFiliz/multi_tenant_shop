@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">Profilim: {% if user.first_name %}{{ user.first_name }}{% else %}{{ user.username }}{% endif %}</h1>
+    
+    <div class="card">
+        <div class="card-header">
+            <h4>Sipariş Geçmişim</h4>
+        </div>
+        <div class="card-body">
+            {% if orders %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th scope="col">Sipariş ID</th>
+                                <th scope="col">Tarih</th>
+                                <th scope="col">Toplam Tutar</th>
+                                <th scope="col">Durum</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in orders %}
+                            <tr>
+                                <td>#{{ order.id }}</td>
+                                <td>{{ order.order_date|date:"d F Y" }}</td>
+                                <td>{{ order.total_amount }} TL</td>
+                                <td>
+                                    <span class="badge bg-primary">{{ order.get_status_display }}</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p>Henüz hiç sipariş vermediniz.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock content %}
