@@ -1,6 +1,7 @@
 # store/urls.py
 from django.urls import path
 from . import views
+from django.contrib.auth import views as auth_views
 
 app_name = 'store'
 
@@ -18,4 +19,11 @@ urlpatterns = [
     path('cart/update/<int:variant_id>/', views.cart_update, name='cart_update'),
 
     path('checkout/', views.checkout, name='checkout'),
+
+    # URL for the user registration page.
+    path('signup/', views.signup, name='signup'),
+    # Django's built-in LoginView. We just need to tell it which template to use.
+    path('login/', auth_views.LoginView.as_view(template_name='store/login.html'), name='login'),
+    # Django's built-in LogoutView. It handles logout and redirects to the homepage.
+    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
 ]

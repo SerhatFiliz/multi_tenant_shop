@@ -7,6 +7,10 @@ from django.views.decorators.http import require_POST
 from .cart import Cart
 
 from .forms import OrderCreateForm
+
+from .forms import OrderCreateForm, CustomUserCreationForm
+from django.contrib.auth import login
+
 # We use Class-Based Views (CBVs) as they are a professional and reusable way
 # to structure view logic.
 
@@ -154,3 +158,20 @@ def checkout(request):
 
     # Render the checkout template, passing the cart (for the summary) and the form.
     return render(request, 'store/checkout.html', {'cart': cart, 'form': form})
+
+def signup(request):
+    if request.method == 'POST':
+        # If the form is submitted, create a form instance with the POST data.
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            # If the form is valid, save the new user to the database.
+            user = form.save()
+            # Log the user in automatically after successful registration.
+            login(request, user)
+            # Redirect to the homepage.
+            return redirect('store:home')
+    else:
+        # If it's a GET request, create a blank form.
+        form = CustomUserCreationForm()
+
+    return render(request, 'store/signup.html', {'form': form})

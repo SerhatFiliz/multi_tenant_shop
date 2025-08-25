@@ -2,7 +2,8 @@
 
 # Import the forms module from Django and our Address model.
 from django import forms
-from .models import Address
+from .models import Address, User
+from django.contrib.auth.forms import UserCreationForm
 
 # We are creating a ModelForm. This special type of form is automatically
 # generated from a Django Model. It's a very fast and professional way to handle data input.
@@ -36,3 +37,11 @@ class OrderCreateForm(forms.ModelForm):
             'city': forms.TextInput(attrs={'class': 'form-control'}),
             'postal_code': forms.TextInput(attrs={'class': 'form-control'}),
         }
+
+
+class CustomUserCreationForm(UserCreationForm):
+    class Meta(UserCreationForm.Meta):
+        # Tell the form to use our custom User model
+        model = User
+        # Specify the fields to display on the registration form
+        fields = ('username', 'email', 'first_name', 'last_name')
