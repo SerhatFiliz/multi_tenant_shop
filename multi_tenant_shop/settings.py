@@ -54,7 +54,8 @@ MIDDLEWARE = [
 SHARED_APPS = [
     'django_tenants',
     'store',  # Our app for managing tenants and later, products.
-
+    'store_management',
+    
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

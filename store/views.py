@@ -1,6 +1,6 @@
 # store/views.py
 from django.views.generic import TemplateView, ListView, DetailView 
-from .models import Product, ProductVariant, Order, OrderItem, Review
+from .models import Product, ProductVariant, Order, OrderItem, Review, Address
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
@@ -194,12 +194,15 @@ def signup(request):
 # If an anonymous user tries to access it, they will be redirected to the login page.
 @login_required
 def profile(request):
-    # Filter the Order model to get only the orders that belong to the current user.
-    # order_by('-order_date') sorts the orders from newest to oldest.
     orders = Order.objects.filter(user=request.user).order_by('-order_date')
-    
-    # Render the profile template, passing the list of orders to it.
-    return render(request, 'store/profile.html', {'orders': orders})
+    addresses = Address.objects.filter(user=request.user)
+
+    # --- UPDATE THE CONTEXT ---
+    context = {
+        'orders': orders,
+        'addresses': addresses
+    }
+    return render(request, 'store/profile.html', context)
 
 @login_required # Only logged-in users can submit reviews.
 def submit_review(request, slug):
@@ -237,3 +240,51 @@ def submit_review(request, slug):
 
     # Pass the purchase status to the template to conditionally show the form.
     return render(request, 'store/product_detail.html', {'form': form, 'product': product, 'has_purchased': has_purchased})
+
+
+@login_required
+def add_address(request):
+    """
+    Handles the creation of a new address for the logged-in user.
+    """
+    if request.method == 'POST':
+        form = OrderCreateForm(request.POST)
+        if form.is_valid():
+            address = form.save(commit=False)
+            address.user = request.user # Associate the address with the current user
+            address.save()
+            return redirect('store:profile') # Redirect back to the profile page
+    else:
+        form = OrderCreateForm()
+    return render(request, 'store/address_form.html', {'form': form})
+
+@login_required
+def edit_address(request, address_id):
+    """
+    Handles editing an existing address.
+    """
+    # get_object_or_404 ensures we only get the address if it exists AND belongs to the current user.
+    # This is a crucial security measure.
+    address = get_object_or_404(Address, id=address_id, user=request.user)
+    if request.method == 'POST':
+        # 'instance=address' pre-populates the form with the existing address data.
+        form = OrderCreateForm(request.POST, instance=address)
+        if form.is_valid():
+            form.save()
+            return redirect('store:profile')
+    else:
+        form = OrderCreateForm(instance=address)
+    return render(request, 'store/address_form.html', {'form': form, 'address': address})
+
+@login_required
+def delete_address(request, address_id):
+    """
+    Handles deleting an existing address.
+    """
+    address = get_object_or_404(Address, id=address_id, user=request.user)
+    if request.method == 'POST':
+        address.delete()
+        return redirect('store:profile')
+    # If it's a GET request, we can optionally show a confirmation page.
+    # For simplicity, we'll only handle POST for deletion.
+    return redirect('store:profile')

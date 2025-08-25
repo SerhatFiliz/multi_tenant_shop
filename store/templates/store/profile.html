@@ -4,6 +4,37 @@
 <div class="container mt-5">
     <h1 class="mb-4">Profilim: {% if user.first_name %}{{ user.first_name }}{% else %}{{ user.username }}{% endif %}</h1>
     
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4>Kayıtlı Adreslerim</h4>
+            <a href="{% url 'store:add_address' %}" class="btn btn-sm btn-primary">Yeni Adres Ekle</a>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for address in addresses %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ address.address_title|default:"Adres" }}</h5>
+                                <p class="card-text mb-1"><strong>{{ address.full_name }}</strong></p>
+                                <p class="card-text mb-1">{{ address.address_line_1 }}</p>
+                                <p class="card-text mb-1">{{ address.postal_code }} {{ address.city }}</p>
+                                <p class="card-text">{{ address.phone_number }}</p>
+                                <a href="{% url 'store:edit_address' address.id %}" class="btn btn-sm btn-secondary">Düzenle</a>
+                                <form action="{% url 'store:delete_address' address.id %}" method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Bu adresi silmek istediğinizden emin misiniz?')">Sil</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                {% empty %}
+                    <p>Henüz kayıtlı bir adresiniz bulunmamaktadır.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-header">
             <h4>Sipariş Geçmişim</h4>
@@ -26,9 +57,7 @@
                                 <td>#{{ order.id }}</td>
                                 <td>{{ order.order_date|date:"d F Y" }}</td>
                                 <td>{{ order.total_amount }} TL</td>
-                                <td>
-                                    <span class="badge bg-primary">{{ order.get_status_display }}</span>
-                                </td>
+                                <td><span class="badge bg-primary">{{ order.get_status_display }}</span></td>
                             </tr>
                             {% endfor %}
                         </tbody>
