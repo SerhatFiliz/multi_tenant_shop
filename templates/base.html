@@ -28,6 +28,10 @@
                 </ul>
 
                 <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
+                    <form class="d-flex me-2" action="{% url 'store:search' %}" method="get">
+                        <input class="form-control me-2 form-control-sm" type="search" name="q" placeholder="Ürün Ara..." aria-label="Search">
+                        <button class="btn btn-outline-light btn-sm" type="submit">Ara</button>
+                    </form>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'store:cart_detail' %}">Sepet ({{ cart|length }})</a>
                     </li>

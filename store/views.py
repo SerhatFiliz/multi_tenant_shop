@@ -13,6 +13,8 @@ from django.contrib.auth import login
 
 from django.contrib.auth.decorators import login_required
 
+from .documents import ProductVariantDocument
+
 # We use Class-Based Views (CBVs) as they are a professional and reusable way
 # to structure view logic.
 
@@ -288,3 +290,34 @@ def delete_address(request, address_id):
     # If it's a GET request, we can optionally show a confirmation page.
     # For simplicity, we'll only handle POST for deletion.
     return redirect('store:profile')
+
+
+def search(request):
+    """
+    Handles the search functionality by querying the Elasticsearch index.
+    """
+    # Get the search query from the URL's GET parameter named 'q'.
+    query = request.GET.get('q', '')
+
+    results = []
+    if query:
+        # If a query was submitted, perform the search.
+        search_request = ProductVariantDocument.search()
+
+        # Use a 'multi_match' query to search across multiple fields.
+        # 'fuzziness="AUTO"' handles minor typos automatically.
+        search_request = search_request.query(
+            "multi_match",
+            query=query,
+            fields=['product_name', 'color', 'sku'],
+            fuzziness="AUTO"
+        )
+
+        # Execute the search and get the response from Elasticsearch.
+        results = search_request.execute()
+
+    context = {
+        'query': query,
+        'results': results
+    }
+    return render(request, 'store/search_results.html', context)

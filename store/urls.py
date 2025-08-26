@@ -37,4 +37,7 @@ urlpatterns = [
     path('profile/address/add/', views.add_address, name='add_address'),
     path('profile/address/edit/<int:address_id>/', views.edit_address, name='edit_address'),
     path('profile/address/delete/<int:address_id>/', views.delete_address, name='delete_address'),
+
+    # URL for the search results page.
+    path('search/', views.search, name='search'),
 ]

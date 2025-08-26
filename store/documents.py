@@ -6,41 +6,23 @@ from .models import ProductVariant
 
 @registry.register_document
 class ProductVariantDocument(Document):
-    """
-    This class defines the Elasticsearch document for our ProductVariant model.
-    It specifies which fields from the model should be indexed and how.
-    """
-    
-    # We create a 'TextField' for product name to enable full-text search.
-    # We access the related Product model's name via 'product.name'.
     product_name = fields.TextField(
         attr='product.name',
-        fields={
-            'raw': fields.KeywordField(),
-        }
+        fields={'raw': fields.KeywordField()}
     )
-    
-    # We create a 'TextField' for color, also for full-text search.
     color = fields.TextField(
-        fields={
-            'raw': fields.KeywordField(),
-        }
+        fields={'raw': fields.KeywordField()}
     )
+
+    # --- ADD THIS NEW FIELD ---
+    # We need the product's slug to create correct links in the search results.
+    # A 'KeywordField' is good for exact-match data like a slug.
+    product_slug = fields.KeywordField(attr='product.slug')
 
     class Index:
-        # Name of the Elasticsearch index
         name = 'product_variants'
-        # See Elasticsearch Indices API reference for available settings
-        settings = {'number_of_shards': 1,
-                    'number_of_replicas': 0}
+        settings = {'number_of_shards': 1, 'number_of_replicas': 0}
 
     class Django:
-        model = ProductVariant # The model associated with this document
-        
-        # The fields of the model you want to be indexed in Elasticsearch
-        fields = [
-            'sku',
-            'sale_price',
-            'size',
-            'is_active',
-        ]
+        model = ProductVariant
+        fields = ['sku', 'sale_price', 'size', 'is_active']
