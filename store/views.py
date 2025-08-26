@@ -1,6 +1,6 @@
-# store/views.py
+    # store/views.py
 from django.views.generic import TemplateView, ListView, DetailView 
-from .models import Product, ProductVariant, Order, OrderItem, Review, Address
+from .models import Product, ProductVariant, Order, OrderItem, Review, Address, Category
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
@@ -14,6 +14,10 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 
 from .documents import ProductVariantDocument
+
+# --- Dosyanın en üstündeki import satırlarına bunları ekle ---
+from rest_framework import viewsets
+from .serializers import ProductSerializer, CategorySerializer
 
 # We use Class-Based Views (CBVs) as they are a professional and reusable way
 # to structure view logic.
@@ -321,3 +325,23 @@ def search(request):
         'results': results
     }
     return render(request, 'store/search_results.html', context)
+
+
+class ProductViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    This ViewSet automatically provides 'list' and 'retrieve' actions for Products.
+    """
+    # The queryset of objects that this ViewSet will handle.
+    queryset = Product.objects.filter(is_active=True)
+    # The serializer class to use for converting Product objects to/from JSON.
+    serializer_class = ProductSerializer
+    # The field to use for looking up a single object (instead of the default 'id').
+    lookup_field = 'slug'
+
+class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    This ViewSet automatically provides 'list' and 'retrieve' actions for Categories.
+    """
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    lookup_field = 'slug'

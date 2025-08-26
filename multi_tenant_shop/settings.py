@@ -81,6 +81,7 @@ TENANT_APPS = [
 
     'django_filters',
     'django_elasticsearch_dsl',
+    'rest_framework',
 ]
 
 # The final INSTALLED_APPS is a combination of both lists.
