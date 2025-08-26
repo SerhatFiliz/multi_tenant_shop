@@ -1,17 +1,22 @@
 {% extends "base.html" %}
-{% load crispy_forms_tags %} {% block content %}
+{% load crispy_forms_tags %}
+
+{% block content %}
 <div class="container mt-5">
-    <h1 class="mb-4">Ödeme Bilgileri</h1>
+    <h1 class="mb-4">Ödeme</h1>
     <div class="row">
         <div class="col-md-7">
             <div class="card">
                 <div class="card-body">
-                    <h4 class="card-title">Teslimat Adresi</h4>
-                    <form action="." method="post">
+                    <h4 class="card-title">1. Teslimat Adresi</h4>
+                    <form id="address-form" method="post">
                         {% csrf_token %}
                         {{ form|crispy }}
-                        <button type="submit" class="btn btn-primary w-100 mt-3">Siparişi Tamamla</button>
                     </form>
+
+                    <h4 class="card-title mt-4">2. Ödeme Bilgileri</h4>
+                    <div id="payment-element" class="mb-3"></div>
+                    <div id="payment-message" class="text-danger"></div>
                 </div>
             </div>
         </div>
@@ -21,22 +26,67 @@
                     <h4 class="card-title">Sipariş Özeti</h4>
                     <ul class="list-group list-group-flush">
                         {% for item in cart %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="my-0">{{ item.variant.product.name }}</h6>
-                                <small class="text-muted">{{ item.variant.color }} x {{ item.quantity }}</small>
-                            </div>
-                            <span class="text-muted">{{ item.total_price }} TL</span>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>{{ item.variant.product.name }} (x{{ item.quantity }})</span>
+                            <strong>{{ item.total_price }} TL</strong>
                         </li>
                         {% endfor %}
                         <li class="list-group-item d-flex justify-content-between">
-                            <span>Toplam (TL)</span>
+                            <span>Toplam Tutar</span>
                             <strong>{{ cart.get_total_price }} TL</strong>
                         </li>
                     </ul>
+                     <button id="submit-button" class="btn btn-primary w-100 mt-4">Ödemeyi Tamamla ve Sipariş Ver</button>
                 </div>
             </div>
         </div>
     </div>
 </div>
 {% endblock content %}
+
+{% block extra_scripts %}
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get keys from our Django template
+        const stripe = Stripe("{{ stripe_publishable_key }}");
+        const clientSecret = "{{ client_secret }}";
+
+        // Initialize and mount the Stripe Payment Element
+        const elements = stripe.elements({ clientSecret });
+        const paymentElement = elements.create("payment");
+        paymentElement.mount("#payment-element");
+
+        const submitButton = document.getElementById('submit-button');
+        const addressForm = document.getElementById('address-form');
+        const paymentMessage = document.getElementById('payment-message');
+
+        submitButton.addEventListener('click', async function(e) {
+            e.preventDefault();
+
+            // First, check if the address form is valid
+            if (!addressForm.checkValidity()) {
+                addressForm.reportValidity();
+                return;
+            }
+
+            submitButton.disabled = true; // Prevent multiple clicks
+
+            // Confirm the payment with Stripe. Card details are sent directly to Stripe.
+            const { error } = await stripe.confirmPayment({
+                elements,
+                redirect: 'if_required' // We handle the redirect ourselves
+            });
+
+            if (error) {
+                paymentMessage.textContent = error.message;
+                submitButton.disabled = false; // Re-enable the button if payment fails
+            } else {
+                // Payment succeeded! Now we submit our address form to our Django backend to create the Order.
+                paymentMessage.textContent = "Ödeme başarılı! Sipariş oluşturuluyor...";
+                addressForm.submit();
+            }
+        });
+    });
+</script>
+{% endblock extra_scripts %}

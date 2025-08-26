@@ -19,6 +19,9 @@ from .documents import ProductVariantDocument
 from rest_framework import viewsets
 from .serializers import ProductSerializer, CategorySerializer
 
+import stripe
+from django.conf import settings
+
 # We use Class-Based Views (CBVs) as they are a professional and reusable way
 # to structure view logic.
 
@@ -122,61 +125,66 @@ def cart_update(request, variant_id):
         
     return redirect('store:cart_detail')
 
-# This view will handle both displaying the checkout form (GET request)
-# and processing the submitted form data (POST request).
+# We make the checkout page login-required to simplify the process.
+# We make the checkout page login-required to simplify the payment flow.
+@login_required
 def checkout(request):
-    # Get the user's current cart from the session.
     cart = Cart(request)
+    # Set your secret key for the Stripe API.
+    stripe.api_key = settings.STRIPE_SECRET_KEY
 
-    # Check if the form has been submitted using the POST method.
+    # This block is now triggered AFTER a successful payment on the frontend.
     if request.method == 'POST':
-        # Create a form instance and populate it with data from the request (binding).
         form = OrderCreateForm(request.POST)
-
-        # Check if the form's data is valid according to our model's rules.
         if form.is_valid():
-            # The form is valid. First, create the Address object in memory.
-            # 'commit=False' prevents the form from saving to the DB immediately.
-            # This allows us to modify the object before the final save.
             address = form.save(commit=False)
-
-            # Check if the user is authenticated (logged in).
-            if request.user.is_authenticated:
-                # If logged in, associate this new address with the current user.
-                address.user = request.user
-
-            # Now, save the address to the database (either with or without a user).
+            address.user = request.user
             address.save()
 
-            # Create a new Order record in the database.
             order = Order.objects.create(
-                user=request.user if request.user.is_authenticated else None,
-                shipping_address=address, # Link the order to the address we just saved.
-                total_amount=cart.get_total_price() # Get the total from our cart object.
+                user=request.user,
+                shipping_address=address,
+                total_amount=cart.get_total_price()
             )
 
-            # Loop through every item currently in the cart.
             for item in cart:
-                # For each item, create a corresponding OrderItem record in the database.
                 OrderItem.objects.create(
-                    order=order, # Link it to the order we just created.
+                    order=order,
                     product_variant=item['variant'],
-                    price=item['price'], # Store the price at the time of purchase.
+                    price=item['price'],
                     quantity=item['quantity']
                 )
-
-            # The order is successfully created, so clear the cart from the session.
+            
             cart.clear()
-
-            # Redirect the user to a success page (for now, we'll use the homepage).
-            # Later, we can create a dedicated "Thank You" page.
-            return redirect('store:home') 
+            # We can add an order confirmation email here later using Celery.
+            return redirect('store:profile') # Redirect to profile to see the new order.
     else:
-        # If it's a GET request (the user is just visiting the page), create a blank form instance.
+        # This block runs when the page is first loaded (GET request).
         form = OrderCreateForm()
-
-    # Render the checkout template, passing the cart (for the summary) and the form.
-    return render(request, 'store/checkout.html', {'cart': cart, 'form': form})
+        intent = None
+        # We only create a payment intent if the cart is not empty.
+        if cart.get_total_price() > 0:
+            try:
+                # Create a PaymentIntent on Stripe's servers.
+                # The amount is in the smallest currency unit (e.g., cents for USD, kuruş for TRY).
+                intent = stripe.PaymentIntent.create(
+                    amount=int(cart.get_total_price() * 100), # Amount in kuruş for TRY
+                    currency='try', # Change if you use a different currency
+                    automatic_payment_methods={'enabled': True},
+                )
+            except stripe.error.StripeError as e:
+                # Handle potential errors from Stripe, e.g., if the amount is zero.
+                print(f"Stripe Error: {e}")
+        
+    context = {
+        'cart': cart,
+        'form': form,
+        'stripe_publishable_key': settings.STRIPE_PUBLISHABLE_KEY,
+        # The client_secret is a temporary key for this specific payment.
+        # It authorizes the frontend to confirm the payment.
+        'client_secret': intent.client_secret if intent else None,
+    }
+    return render(request, 'store/checkout.html', context)
 
 def signup(request):
     if request.method == 'POST':

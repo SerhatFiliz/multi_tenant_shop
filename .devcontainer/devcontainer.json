@@ -1,0 +1,34 @@
+{
+    // A name for your development container configuration
+    "name": "Multi-Tenant Django Shop",
+
+    // This tells VS Code to use your docker-compose.yml file to build the environment.
+    "dockerComposeFile": [
+        "../docker-compose.yml"
+    ],
+
+    // This specifies which service from your docker-compose.yml file VS Code
+    // should use as the main development container. We will work inside the 'web' service.
+    "service": "web",
+
+    // This sets the path of the project folder inside the container.
+    // When VS Code attaches, it will open this folder by default.
+    "workspaceFolder": "/app",
+
+    // This is a life-saving feature. It lists the VS Code extensions that
+    // should be AUTOMATICALLY installed inside the container for you.
+    // You will never have to manually install them in the container again.
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.pylance",
+                "ms-azuretools.vscode-docker"
+            ]
+        }
+    },
+
+    // This command runs AFTER the container is created.
+    // We can use it for tasks like installing dependencies, but for now, we'll leave it empty.
+    "postCreateCommand": ""
+}
