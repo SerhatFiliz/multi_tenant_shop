@@ -32,17 +32,21 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 class ProductSerializer(serializers.ModelSerializer):
     """
     Serializer for the Product model.
-    This serializer includes its related variants using a nested serializer,
-    demonstrating how to represent relationships in an API.
+    This version handles nested reading and simple writing of relationships.
     """
-    # 'variants' is the 'related_name' from the ProductVariant model's ForeignKey.
-    # 'many=True' indicates that a product can have multiple variants.
-    # 'read_only=True' means this nested data can be viewed but not updated through this specific serializer.
-    variants = ProductVariantSerializer(many=True, read_only=True)
-    
-    # We are also nesting the CategorySerializer to show category details, not just its ID.
+    # For GET requests (reading data), show the full nested Category object.
     category = CategorySerializer(read_only=True)
+    # For POST/PUT requests (writing data), expect only the category's primary key (ID).
+    # 'write_only=True' means this field is used for input, but not shown in the output.
+    # 'queryset' is needed for validation to ensure the provided ID is valid.
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(), source='category', write_only=True
+    )
+    
+    # The nested variants representation remains the same (read-only).
+    variants = ProductVariantSerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
-        fields = ['id', 'name', 'slug', 'description', 'category', 'variants']
+        # Add 'category_id' to the list of fields.
+        fields = ['id', 'name', 'slug', 'description', 'category', 'category_id', 'variants']

@@ -174,3 +174,22 @@ ELASTICSEARCH_DSL = {
         'hosts': f"http://{os.getenv('ELASTICSEARCH_HOST')}:9200",
     },
 }
+
+# ==============================================================================
+# DJANGO REST FRAMEWORK (DRF) CONFIGURATION
+# ==============================================================================
+REST_FRAMEWORK = {
+    # This sets the default permission policy for all API views.
+    # 'IsAuthenticatedOrReadOnly' allows any user (anonymous or logged in) to view the data (GET requests),
+    # but requires the user to be authenticated for any write actions (POST, PUT, PATCH, DELETE).
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ],
+    # This defines the methods DRF will use to try to authenticate a user.
+    # 'SessionAuthentication' is used for the Browsable API (it uses Django's login session).
+    # 'TokenAuthentication' will be used later for mobile apps or other services.
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        # 'rest_framework.authentication.TokenAuthentication', # We will enable this later
+    ],
+}

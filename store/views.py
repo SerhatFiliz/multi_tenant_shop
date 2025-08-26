@@ -327,20 +327,20 @@ def search(request):
     return render(request, 'store/search_results.html', context)
 
 
-class ProductViewSet(viewsets.ReadOnlyModelViewSet):
+# --- ProductViewSet sınıfını güncelle ---
+class ProductViewSet(viewsets.ModelViewSet): # ReadOnlyModelViewSet'i ModelViewSet ile değiştir
     """
-    This ViewSet automatically provides 'list' and 'retrieve' actions for Products.
+    This ViewSet now provides full 'list', 'create', 'retrieve',
+    'update', and 'destroy' actions for Products.
     """
-    # The queryset of objects that this ViewSet will handle.
     queryset = Product.objects.filter(is_active=True)
-    # The serializer class to use for converting Product objects to/from JSON.
     serializer_class = ProductSerializer
-    # The field to use for looking up a single object (instead of the default 'id').
     lookup_field = 'slug'
 
-class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+# --- CategoryViewSet sınıfını güncelle ---
+class CategoryViewSet(viewsets.ModelViewSet): # ReadOnlyModelViewSet'i ModelViewSet ile değiştir
     """
-    This ViewSet automatically provides 'list' and 'retrieve' actions for Categories.
+    This ViewSet now provides full CRUD actions for Categories.
     """
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
