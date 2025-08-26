@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+import socket
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
@@ -44,6 +46,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
 
 # --- SHARED AND TENANT APPS ---
@@ -62,6 +65,7 @@ SHARED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'debug_toolbar',
 
     'crispy_forms',
     'crispy_bootstrap5',
@@ -123,6 +127,22 @@ DATABASES = {
         'PASSWORD': os.getenv('DATABASE_PASSWORD'),
         'HOST': os.getenv('DATABASE_HOST'),
         'PORT': os.getenv('DATABASE_PORT'),
+    }
+}
+
+# ==============================================================================
+# CACHING CONFIGURATION
+# ==============================================================================
+CACHES = {
+    "default": {
+        # Use the django-redis backend.
+        "BACKEND": "django_redis.cache.RedisCache",
+        # Connect to the 'redis' service defined in docker-compose.yml on the default port.
+        # The '/1' specifies which Redis database to use (Redis can have multiple).
+        "LOCATION": "redis://redis:6379/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
     }
 }
 
@@ -196,3 +216,8 @@ REST_FRAMEWORK = {
 
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
+
+# This logic dynamically finds the host's IP address within the Docker network
+# and adds it to INTERNAL_IPS, allowing the Debug Toolbar to appear.
+hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
+INTERNAL_IPS = [ip[: ip.rfind(".")] + ".1" for ip in ips] + ["127.0.0.1"]

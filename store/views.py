@@ -33,19 +33,22 @@ class HomePageView(TemplateView):
 
 class ProductListView(ListView):
     """
-    This view fetches a list of objects from the database and passes them
-    to a template. It's perfect for a product listing page.
+    This view now has a single, simple job: to display a list of
+    all active product variants from the database.
+    All smart searching is now handled by our 'search' view and Elasticsearch.
     """
-    model = ProductVariant  # Which model should I get data from?
-    template_name = 'store/product_list.html'  # Which template should I send the data to?
-    context_object_name = 'variants'  # What should the list of objects be called in the template?
+    model = ProductVariant
+    template_name = 'store/product_list.html'
+    context_object_name = 'variants'
+    paginate_by = 12 
 
     def get_queryset(self):
         """
-        We override this method to control which objects are listed.
-        Here, we only want to show variants that are active and have stock.
+        We override this to fetch all active variants and optimize the database query.
         """
-        return ProductVariant.objects.filter(is_active=True, stock_quantity__gt=0)
+        # We use select_related to prevent extra database queries in the template.
+        return ProductVariant.objects.filter(is_active=True).select_related('product__category')
+
     
 class ProductDetailView(DetailView):
     model = Product

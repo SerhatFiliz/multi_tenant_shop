@@ -17,6 +17,7 @@ Including another URLconf
 # multi_tenant_shop/urls.py
 from django.contrib import admin
 from django.urls import path, include # Make sure to import 'include'
+from django.conf import settings
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -26,3 +27,9 @@ urlpatterns = [
     path('', include('store.urls', namespace='store')),
     
 ]
+
+if settings.DEBUG:
+    import debug_toolbar
+    urlpatterns = [
+        path('__debug__/', include(debug_toolbar.urls)),
+    ] + urlpatterns

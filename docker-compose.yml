@@ -43,6 +43,13 @@ services:
     networks:
       - app-network
 
+  # 4. Redis Service
+  redis:
+    image: redis:7-alpine
+    container_name: redis_cache
+    networks:
+      - app-network
+
   # 4. Django Web Application Service
   web:
     build: .
