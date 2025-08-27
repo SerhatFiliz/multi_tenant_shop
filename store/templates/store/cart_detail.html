@@ -1,63 +1,157 @@
 {% extends "base.html" %}
+{% load crispy_forms_tags %}
 
 {% block content %}
 <div class="container mt-5">
     <h1 class="mb-4">Alışveriş Sepetiniz</h1>
 
-    {% if cart %}
-    <div class="table-responsive">
-        <table class="table align-middle">
-            <thead>
-                <tr>
-                    <th scope="col">Ürün</th>
-                    <th scope="col" style="width: 150px;">Adet</th>
-                    <th scope="col" class="text-end">Birim Fiyat</th>
-                    <th scope="col" class="text-end">Toplam Fiyat</th>
-                    <th scope="col" style="width: 100px;"></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in cart %}
-                <tr>
-                    <td>
-                        {{ item.variant.product.name }}
-                        <br>
-                        <small class="text-muted">{{ item.variant.color }} {{ item.variant.size }}</small>
-                    </td>
-                    <td>
-                        <form action="{% url 'store:cart_update' item.variant.id %}" method="post" class="d-flex">
-                            {% csrf_token %}
+    <div id="cart-container">
+        {% if cart %}
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th scope="col">Ürün</th>
+                        <th scope="col" style="width: 150px;">Adet</th>
+                        <th scope="col" class="text-end">Birim Fiyat</th>
+                        <th scope="col" class="text-end">Toplam Fiyat</th>
+                        <th scope="col" style="width: 100px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in cart %}
+                    <tr id="cart-item-{{ item.variant.id }}">
+                        <td>
+                            {{ item.variant.product.name }}
+                            <br>
+                            <small class="text-muted">{{ item.variant.color }} {{ item.variant.size }}</small>
+                        </td>
+                        <td>
+                            <!-- We use data-* attributes to pass the variant ID to our JavaScript -->
                             <input type="number" name="quantity" value="{{ item.quantity }}" 
-                                   class="form-control form-control-sm" min="1" max="100">
-                            <button type="submit" class="btn btn-sm btn-outline-secondary ms-2">✓</button>
-                        </form>
-                    </td>
-                    <td class="text-end">{{ item.price }} TL</td>
-                    <td class="text-end">{{ item.total_price }} TL</td>
-                    <td class="text-center">
-                        <form action="{% url 'store:cart_remove' item.variant.id %}" method="post">
-                             {% csrf_token %}
-                             <button type="submit" class="btn btn-sm btn-outline-danger">Sil</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-                <tr class="table-light">
-                    <td colspan="4" class="text-end"><strong>Genel Toplam</strong></td>
-                    <td class="text-end"><strong>{{ cart.get_total_price }} TL</strong></td>
-                    <td></td>
-                </tr>
-            </tbody>
-        </table>
+                                   class="form-control form-control-sm quantity-input" 
+                                   min="1" max="100" data-variant-id="{{ item.variant.id }}">
+                        </td>
+                        <td class="text-end">{{ item.price|stringformat:".2f" }} TL</td>
+                        <td class="text-end" id="item-total-{{ item.variant.id }}">{{ item.total_price|stringformat:".2f" }} TL</td>
+                        <td class="text-center">
+                             <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-variant-id="{{ item.variant.id }}">Sil</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="table-light">
+                        <td colspan="3" class="text-end"><strong>Genel Toplam</strong></td>
+                        <td class="text-end"><strong id="cart-total-price">{{ cart.get_total_price|stringformat:".2f" }} TL</strong></td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="text-end mt-4">
+            <a href="{% url 'store:product_list' %}" class="btn btn-secondary">Alışverişe Devam Et</a>
+            <a href="{% url 'store:checkout' %}" class="btn btn-primary">Ödemeye Geç</a>
+        </div>
+        {% else %}
+        <div class="alert alert-info" role="alert">
+            Sepetinizde henüz ürün bulunmamaktadır.
+        </div>
+        {% endif %}
     </div>
-    <div class="text-end mt-4">
-        <a href="{% url 'store:product_list' %}" class="btn btn-secondary">Alışverişe Devam Et</a>
-        <a href="{% url 'store:checkout' %}" class="btn btn-primary">Ödemeye Geç</a>
-    </div>
-    {% else %}
-    <div class="alert alert-info" role="alert">
-        Sepetinizde henüz ürün bulunmamaktadır.
-    </div>
-    {% endif %}
 </div>
 {% endblock content %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cartContainer = document.getElementById('cart-container');
+    
+    // --- THIS IS THE FIX ---
+    // We use backticks (`) to define the string, which allows us to use
+    // single quotes inside it without causing a syntax error.
+    const navbarCart = document.querySelector(`a[href="{% url 'store:cart_detail' %}"]`);
+
+    // Function to get the CSRF token required for POST requests
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    // Event listener for quantity changes
+    cartContainer.addEventListener('change', function(e) {
+        if (e.target.classList.contains('quantity-input')) {
+            const variantId = e.target.dataset.variantId;
+            const quantity = e.target.value;
+            updateCart(variantId, quantity);
+        }
+    });
+
+    // Event listener for remove button clicks
+    cartContainer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-item-btn')) {
+            const variantId = e.target.dataset.variantId;
+            removeItem(variantId);
+        }
+    });
+
+    // Function to send the update request to our API-like view
+    async function updateCart(variantId, quantity) {
+        const response = await fetch("{% url 'store:cart_update_api' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({
+                'variant_id': variantId,
+                'quantity': quantity
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            // Update the UI with the new data from the server's response
+            document.getElementById(`item-total-${variantId}`).textContent = parseFloat(data.item_total_price).toFixed(2) + ' TL';
+            document.getElementById('cart-total-price').textContent = parseFloat(data.cart_total_price).toFixed(2) + ' TL';
+            if (navbarCart) {
+                navbarCart.textContent = `Sepet (${data.cart_total_items})`;
+            }
+        }
+    }
+
+    // Function to send the remove request to our API-like view
+    async function removeItem(variantId) {
+        const response = await fetch("{% url 'store:cart_remove_api' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({ 'variant_id': variantId })
+        });
+        const data = await response.json();
+        if (data.success) {
+            // Update the UI after a successful removal
+            document.getElementById(`cart-item-${variantId}`).remove();
+            document.getElementById('cart-total-price').textContent = parseFloat(data.cart_total_price).toFixed(2) + ' TL';
+            if (navbarCart) {
+                navbarCart.textContent = `Sepet (${data.cart_total_items})`;
+            }
+            // If the cart is now empty, replace the table with a message.
+            if (data.cart_total_items === 0) {
+                cartContainer.innerHTML = `<div class="alert alert-info" role="alert">Sepetinizde henüz ürün bulunmamaktadır.</div>`;
+            }
+        }
+    }
+});
+</script>
+{% endblock extra_scripts %}

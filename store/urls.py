@@ -48,6 +48,9 @@ urlpatterns = [
     # URL for the search results page.
     path('search/', views.search, name='search'),
 
+    # API-like URLs for dynamic cart updates
+    path('api/cart/update/', views.cart_update_api, name='cart_update_api'),
+    path('api/cart/remove/', views.cart_remove_api, name='cart_remove_api'),
 
 ]
 

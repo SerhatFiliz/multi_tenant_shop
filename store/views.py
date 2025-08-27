@@ -24,6 +24,9 @@ from django.conf import settings
 
 from .tasks import send_order_confirmation_email
 
+from django.http import JsonResponse
+import json
+
 # We use Class-Based Views (CBVs) as they are a professional and reusable way
 # to structure view logic.
 
@@ -414,3 +417,59 @@ class CategoryViewSet(viewsets.ModelViewSet): # ReadOnlyModelViewSet'i ModelView
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     lookup_field = 'slug'
+
+
+@require_POST
+def cart_update_api(request):
+    """
+    An API-like view to handle updating a cart item's quantity via AJAX.
+    It expects a JSON POST request and returns a JSON response.
+    """
+    cart = Cart(request)
+    try:
+        data = json.loads(request.body)
+        variant_id = data.get('variant_id')
+        quantity = int(data.get('quantity'))
+
+        if not variant_id or quantity < 1:
+            return JsonResponse({'error': 'Invalid data'}, status=400)
+
+        variant = get_object_or_404(ProductVariant, id=variant_id)
+        cart.add(variant=variant, quantity=quantity, override_quantity=True)
+
+        response_data = {
+            'success': True,
+            'cart_total_price': cart.get_total_price(),
+            'cart_total_items': len(cart),
+            'item_total_price': variant.sale_price * quantity,
+        }
+        return JsonResponse(response_data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@require_POST
+def cart_remove_api(request):
+    """
+    An API-like view to handle removing a cart item via AJAX.
+    """
+    cart = Cart(request)
+    try:
+        data = json.loads(request.body)
+        variant_id = data.get('variant_id')
+
+        if not variant_id:
+            return JsonResponse({'error': 'Invalid data'}, status=400)
+
+        variant = get_object_or_404(ProductVariant, id=variant_id)
+        cart.remove(variant)
+
+        response_data = {
+            'success': True,
+            'cart_total_price': cart.get_total_price(),
+            'cart_total_items': len(cart),
+        }
+        return JsonResponse(response_data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
