@@ -61,31 +61,32 @@ class ProductDetailView(DetailView):
     It fetches the main product object based on the URL slug and then gathers
     all related data, such as variants and reviews, to pass to the template.
     """
-    model = Product
+    model = Product # Let DetailView handle finding the correct Product
     template_name = 'store/product_detail.html'
+    # By default, DetailView uses 'slug' from the URL to lookup the object in the 'Product' model.
     
     def get_context_data(self, **kwargs):
         """
         Overrides the default method to inject additional context data into the template.
-        This is where we prepare all the necessary information the template needs to render.
         """
         context = super().get_context_data(**kwargs)
+        # self.get_object() or self.object refers to the Product instance found by DetailView
         product = self.get_object()
         
         # --- Variant Data ---
-        # Fetch all active variants related to this product.
+        # Now that we have the correct product, fetch its related variants.
         variants_queryset = product.variants.filter(is_active=True)
         context['variants'] = variants_queryset
 
         # --- Data for JavaScript ---
         variants_data_for_js = list(variants_queryset.values(
-            'id', 'sku', 'sale_price', 'stock_quantity', 'color', 'size', 'image'
+            'id', 'sku', 'sale_price', 'stock_quantity', 'color', 'size'
         ))
         context['variants_data_for_js'] = variants_data_for_js
 
         # --- Logic to Determine the Initial Variant to Display ---
         selected_variant_id = self.request.GET.get('variant_id')
-        initial_variant = variants_queryset.first() # Default to the first variant.
+        initial_variant = variants_queryset.first() # Default to the first variant
 
         if selected_variant_id:
             try:
@@ -93,11 +94,9 @@ class ProductDetailView(DetailView):
                 selected_variant_as_object = variants_queryset.get(id=selected_variant_id)
                 initial_variant = selected_variant_as_object
             except ProductVariant.DoesNotExist:
-                # If an invalid variant_id is passed, just use the default first variant.
-                pass
+                pass # If invalid ID, just use the default.
         
         context['initial_variant'] = initial_variant
-        # --- End of Initial Variant Logic ---
 
         # --- Review System Data ---
         context['reviews'] = product.reviews.all().order_by('-created_at')
