@@ -1,0 +1,72 @@
+# .github/workflows/ci.yml
+
+# Name of our workflow. This will be displayed on the GitHub Actions tab.
+name: Django CI
+
+# This section defines the triggers for the workflow.
+on:
+  # Run this workflow on every push to the 'main' branch.
+  push:
+    branches: [ "main" ]
+  # Also run it on every pull request that targets the 'main' branch.
+  pull_request:
+    branches: [ "main" ]
+
+# This section defines the jobs to be executed.
+jobs:
+  # We define a single job named 'build'.
+  build:
+    # The type of virtual machine to run the job on. 'ubuntu-latest' is a standard choice.
+    runs-on: ubuntu-latest
+
+    # This section defines the services (Docker containers) that our job needs.
+    # This is like a mini docker-compose for our CI environment.
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: multi_tenant_shop_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    # This section defines the steps to be executed in our job.
+    steps:
+      # Step 1: Check out the repository's code into the runner.
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up a Python environment.
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # Step 3: Install all project dependencies from requirements.txt.
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      # Step 4: Run the Django tests.
+      # We provide the necessary environment variables for the test run.
+      - name: Run Tests
+        env:
+          # These values must match the 'services' section above and our .env.example
+          DATABASE_NAME: multi_tenant_shop_db
+          DATABASE_USER: postgres
+          DATABASE_PASSWORD: password
+          DATABASE_HOST: localhost # In GitHub Actions, services are available on localhost
+          DATABASE_PORT: 5432
+          SECRET_KEY: 'a-dummy-secret-key-for-ci'
+          # We don't need Stripe or Elasticsearch for our current unit tests.
+        run: python manage.py test
