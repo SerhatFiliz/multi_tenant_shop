@@ -18,6 +18,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include # Make sure to import 'include'
 from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -28,8 +29,17 @@ urlpatterns = [
     
 ]
 
+
+# --- DEVELOPMENT ONLY SETTINGS ---
+# This block adds special URL patterns that are only needed during development.
+# It will not run when DEBUG is False in a production environment.
 if settings.DEBUG:
+    # 1. Add URLs for Django Debug Toolbar
+    # This must be imported only when DEBUG is True.
     import debug_toolbar
     urlpatterns = [
         path('__debug__/', include(debug_toolbar.urls)),
     ] + urlpatterns
+    
+    # 2. Add URLs for serving user-uploaded media files (like product images)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

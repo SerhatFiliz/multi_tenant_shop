@@ -5,9 +5,13 @@
 <div class="row">
     {% for variant in variants %}
     <div class="col-md-4 mb-4">
-        <a href="{% url 'store:product_detail' slug=variant.product.slug %}" class="text-decoration-none text-dark">
+        <a href="{% url 'store:product_detail' slug=variant.product.slug %}?variant_id={{ variant.id }}" class="text-decoration-none text-dark">
             <div class="card h-100">
-                <div class="card-header bg-secondary" style="height: 200px;"></div>
+                {% if variant.image %}
+                    <img src="{{ variant.image.url }}" class="card-img-top" alt="{{ variant.product.name }}">
+                {% else %}
+                    <div class="card-header bg-secondary" style="height: 200px;"></div>
+                {% endif %}
                 <div class="card-body">
                     <h5 class="card-title">{{ variant.product.name }}</h5>
                     <h6 class="card-subtitle mb-2 text-muted">{{ variant.color }} {{ variant.size }}</h6>

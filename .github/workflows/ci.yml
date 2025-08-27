@@ -61,12 +61,14 @@ jobs:
       # We provide the necessary environment variables for the test run.
       - name: Run Tests
         env:
-          # These values must match the 'services' section above and our .env.example
-          DATABASE_NAME: multi_tenant_shop_db
-          DATABASE_USER: postgres
-          DATABASE_PASSWORD: password
-          DATABASE_HOST: localhost # In GitHub Actions, services are available on localhost
-          DATABASE_PORT: 5432
-          SECRET_KEY: 'a-dummy-secret-key-for-ci'
-          # We don't need Stripe or Elasticsearch for our current unit tests.
+            # These values must match the 'services' section above and our .env.example
+            DATABASE_NAME: multi_tenant_shop_db
+            DATABASE_USER: postgres
+            DATABASE_PASSWORD: password
+            # --- THIS IS THE FIX ---
+            # We tell Django to connect to the 'postgres' service, not 'localhost'.
+            # GitHub Actions makes services available via their label name.
+            DATABASE_HOST: postgres
+            DATABASE_PORT: 5432 # We can also specify the port for clarity
+            SECRET_KEY: 'a-dummy-secret-key-for-ci'
         run: python manage.py test

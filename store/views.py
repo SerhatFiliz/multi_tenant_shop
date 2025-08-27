@@ -53,27 +53,54 @@ class ProductListView(ListView):
 
     
 class ProductDetailView(DetailView):
+    """
+    Handles the logic for displaying a single product page.
+    It fetches the main product object based on the URL slug and then gathers
+    all related data, such as variants and reviews, to pass to the template.
+    """
     model = Product
     template_name = 'store/product_detail.html'
-
+    
     def get_context_data(self, **kwargs):
+        """
+        Overrides the default method to inject additional context data into the template.
+        This is where we prepare all the necessary information the template needs to render.
+        """
         context = super().get_context_data(**kwargs)
         product = self.get_object()
+        
+        # --- Variant Data ---
+        # Fetch all active variants related to this product.
         variants_queryset = product.variants.filter(is_active=True)
         context['variants'] = variants_queryset
 
+        # --- Data for JavaScript ---
         variants_data_for_js = list(variants_queryset.values(
-            'id', 'sku', 'sale_price', 'stock_quantity', 'color', 'size'
+            'id', 'sku', 'sale_price', 'stock_quantity', 'color', 'size', 'image'
         ))
         context['variants_data_for_js'] = variants_data_for_js
 
-        # --- ADD THIS NEW LOGIC ---
-        # Get all reviews for the current product.
-        context['reviews'] = product.reviews.all().order_by('-created_at')
-        # Create an instance of the review form to display on the page.
-        context['review_form'] = ReviewForm()
+        # --- Logic to Determine the Initial Variant to Display ---
+        selected_variant_id = self.request.GET.get('variant_id')
+        initial_variant = variants_queryset.first() # Default to the first variant.
 
-        # Check if the current user (if logged in) has purchased this product.
+        if selected_variant_id:
+            try:
+                # Try to find the variant that was clicked from the list page.
+                selected_variant_as_object = variants_queryset.get(id=selected_variant_id)
+                initial_variant = selected_variant_as_object
+            except ProductVariant.DoesNotExist:
+                # If an invalid variant_id is passed, just use the default first variant.
+                pass
+        
+        context['initial_variant'] = initial_variant
+        # --- End of Initial Variant Logic ---
+
+        # --- Review System Data ---
+        context['reviews'] = product.reviews.all().order_by('-created_at')
+        context['review_form'] = ReviewForm()
+        
+        # --- Purchase Verification for Reviews ---
         has_purchased = False
         if self.request.user.is_authenticated:
             has_purchased = Order.objects.filter(
@@ -82,7 +109,6 @@ class ProductDetailView(DetailView):
                 items__product_variant__product=product
             ).exists()
         context['has_purchased'] = has_purchased
-        # --- END OF NEW LOGIC ---
 
         return context
     

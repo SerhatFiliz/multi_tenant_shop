@@ -135,6 +135,10 @@ class ProductVariant(models.Model):
     stock_quantity = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
+    # ImageField stores image files. 'upload_to' specifies the subdirectory
+    # within MEDIA_ROOT where the images will be saved.
+    image = models.ImageField(upload_to='product_images/', blank=True, null=True)
+
     def __str__(self):
         return f"{self.product.name} ({self.color or ''} {self.size or ''}) - SKU: {self.sku}"
 

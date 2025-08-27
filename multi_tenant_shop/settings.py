@@ -234,3 +234,7 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 
+# --- MEDIA FILES CONFIGURATION (for user-uploaded content) ---
+# The absolute filesystem path to the directory that will hold user-uploaded files.
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
