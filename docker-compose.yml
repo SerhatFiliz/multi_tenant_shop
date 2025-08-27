@@ -70,6 +70,19 @@ services:
       - elasticsearch
     networks:
       - app-network
+  
+  # 5. Celery Service 
+  worker:
+    build: .
+    container_name: celery_worker
+    command: celery -A multi_tenant_shop worker -l info
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    networks:
+      - app-network
 
 volumes:
   postgres_data:

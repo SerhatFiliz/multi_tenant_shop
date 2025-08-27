@@ -221,3 +221,16 @@ STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
 # and adds it to INTERNAL_IPS, allowing the Debug Toolbar to appear.
 hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
 INTERNAL_IPS = [ip[: ip.rfind(".")] + ".1" for ip in ips] + ["127.0.0.1"]
+
+# --- EMAIL CONFIGURATION (for development) ---
+# This tells Django to print emails to the console instead of sending them.
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# --- CELERY CONFIGURATION ---
+# We use Redis as our message broker. Celery tasks are sent to this URL.
+CELERY_BROKER_URL = 'redis://redis:6379/0'
+CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+
