@@ -1,6 +1,6 @@
 # .github/workflows/ci.yml
 
-# Name of our workflow. This will be displayed on the GitHub Actions tab.
+# Name of our workflow. This is displayed on the GitHub Actions tab.
 name: Django CI
 
 # This section defines the triggers for the workflow.
@@ -19,8 +19,8 @@ jobs:
     # The type of virtual machine to run the job on. 'ubuntu-latest' is a standard choice.
     runs-on: ubuntu-latest
 
-    # This section defines the services (Docker containers) that our job needs.
-    # This is like a mini docker-compose for our CI environment.
+    # This section defines the services (Docker containers) that our job needs to run alongside it.
+    # Our Django tests need a PostgreSQL database to connect to.
     services:
       postgres:
         image: postgres:15
@@ -28,32 +28,26 @@ jobs:
           POSTGRES_DB: multi_tenant_shop_db
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
+        # Health check to ensure the database is fully ready before the tests start running.
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
-    # This section defines the steps to be executed in our job.
+    # This section defines the sequence of steps to be executed in our job.
     steps:
-      # Step 1: Check out the repository's code into the runner.
+      # Step 1: Check out the repository's code into the runner machine.
       - name: Check out code
         uses: actions/checkout@v4
 
-      # Step 2: Set up a Python environment.
+      # Step 2: Set up a specific Python version environment.
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # Step 3: Install all project dependencies from requirements.txt.
+      # Step 3: Install all project dependencies from the requirements.txt file.
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
@@ -61,14 +55,16 @@ jobs:
       # We provide the necessary environment variables for the test run.
       - name: Run Tests
         env:
-            # These values must match the 'services' section above and our .env.example
-            DATABASE_NAME: multi_tenant_shop_db
-            DATABASE_USER: postgres
-            DATABASE_PASSWORD: password
-            # --- THIS IS THE FIX ---
-            # We tell Django to connect to the 'postgres' service, not 'localhost'.
-            # GitHub Actions makes services available via their label name.
-            DATABASE_HOST: postgres
-            DATABASE_PORT: 5432 # We can also specify the port for clarity
-            SECRET_KEY: 'a-dummy-secret-key-for-ci'
+          # These values must match the 'services' section above.
+          DATABASE_NAME: multi_tenant_shop_db
+          DATABASE_USER: postgres
+          DATABASE_PASSWORD: password
+          # --- THIS IS THE FIX ---
+          # In GitHub Actions, services are mapped to localhost on the runner machine.
+          # So, we must connect to 'localhost' instead of the service name 'postgres'.
+          DATABASE_HOST: localhost
+          # We also need to specify the port that the postgres service exposes.
+          DATABASE_PORT: 5432
+          SECRET_KEY: 'a-dummy-secret-key-for-ci'
+          # We don't need other keys like Stripe or Elasticsearch for our current unit tests.
         run: python manage.py test
