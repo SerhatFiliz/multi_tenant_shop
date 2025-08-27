@@ -70,23 +70,22 @@ class ProductDetailView(DetailView):
         Overrides the default method to inject additional context data into the template.
         """
         context = super().get_context_data(**kwargs)
-        # self.get_object() or self.object refers to the Product instance found by DetailView
         product = self.get_object()
         
         # --- Variant Data ---
-        # Now that we have the correct product, fetch its related variants.
+        # Fetch all active variants related to this product.
         variants_queryset = product.variants.filter(is_active=True)
         context['variants'] = variants_queryset
 
         # --- Data for JavaScript ---
         variants_data_for_js = list(variants_queryset.values(
-            'id', 'sku', 'sale_price', 'stock_quantity', 'color', 'size'
+            'id', 'sku', 'sale_price', 'stock_quantity', 'color', 'size', 'image'
         ))
         context['variants_data_for_js'] = variants_data_for_js
 
         # --- Logic to Determine the Initial Variant to Display ---
         selected_variant_id = self.request.GET.get('variant_id')
-        initial_variant = variants_queryset.first() # Default to the first variant
+        initial_variant = variants_queryset.first() # Default to the first variant.
 
         if selected_variant_id:
             try:
