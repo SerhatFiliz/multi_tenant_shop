@@ -67,3 +67,4 @@ class ReviewForm(forms.ModelForm):
             'rating': 'Puanınız',
             'comment': 'Yorumunuz',
         }
+        

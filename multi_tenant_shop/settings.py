@@ -7,10 +7,12 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-
+from datetime import timedelta
 import socket
 
+# Base directory of the project.
 BASE_DIR = Path(__file__).resolve().parent.parent
+# Loads environment variables from the .env file.
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 # ==============================================================================
@@ -18,12 +20,13 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 # ==============================================================================
 
 SECRET_KEY = os.getenv('SECRET_KEY')
+# Enables debug mode for development.
 DEBUG = True
-ALLOWED_HOSTS = ['*'] # We use '*' for local development convenience. We'll make this more secure later.
+# Allows all incoming requests in development.
+ALLOWED_HOSTS = ['*']
 
 # ==============================================================================
 # MULTI-TENANCY CONFIGURATION (django-tenants)
-# This is the brain of our multi-tenant architecture.
 # ==============================================================================
 
 # --- DATABASE ROUTER ---
@@ -34,9 +37,8 @@ DATABASE_ROUTERS = (
 )
 
 # --- MIDDLEWARE ---
-# The TenantMainMiddleware must be the first middleware.
-# It inspects the incoming request's hostname (e.g., 'store1.localhost')
-# to determine the correct tenant and activates its schema for the entire request lifecycle.
+# The TenantMainMiddleware must be the first middleware in the list.
+# It inspects the incoming request's hostname to determine the correct tenant.
 MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',
     'django.middleware.security.SecurityMiddleware',
@@ -50,14 +52,11 @@ MIDDLEWARE = [
 ]
 
 # --- SHARED AND TENANT APPS ---
-# Here, we separate our Django apps into two categories:
-# SHARED_APPS: These live in the 'public' schema and are shared by all tenants.
-#              This includes the django-tenants app itself and the app that
-#              defines our Tenant model (which we will create and name 'store').
+# These apps live in the 'public' schema and are shared by all tenants.
 SHARED_APPS = [
     'django_tenants',
-    'store',  # Our app for managing tenants and later, products.
-    'store_management',
+    'store', # Our main app for managing tenants and products.
+    'store_management', # App for store administration.
     
     'django.contrib.admin',
     'django.contrib.auth',
@@ -65,31 +64,26 @@ SHARED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'debug_toolbar',
-
+    
     'crispy_forms',
     'crispy_bootstrap5',
+    'debug_toolbar',
+    
+    # REST Framework, JWT, and API docs packages which are common for all tenants.
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
+    'drf_spectacular',
 ]
 
-# TENANT_APPS: These apps will have their tables created in EACH tenant's schema.
-#              For example, each store will have its own set of products and orders.
-#              Right now, we only list the essential Django apps that each tenant needs.
+# These apps will have their tables created in EACH tenant's schema.
 TENANT_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    # Any other tenant-specific apps will be added here.
-
     'django_filters',
     'django_elasticsearch_dsl',
-    'rest_framework',
+    # Other tenant-specific apps should be added here.
 ]
 
-# The final INSTALLED_APPS is a combination of both lists.
-# The 'set' is used to remove duplicates.
+# The final INSTALLED_APPS is a combination of both lists to avoid duplicates.
 INSTALLED_APPS = list(set(SHARED_APPS + TENANT_APPS))
 
 # ==============================================================================
@@ -120,7 +114,6 @@ WSGI_APPLICATION = 'multi_tenant_shop.wsgi.application'
 # --- DATABASE CONFIGURATION ---
 DATABASES = {
     'default': {
-        # We specify the postgresql_backend engine provided by django-tenants
         'ENGINE': 'django_tenants.postgresql_backend',
         'NAME': os.getenv('DATABASE_NAME'),
         'USER': os.getenv('DATABASE_USER'),
@@ -135,10 +128,8 @@ DATABASES = {
 # ==============================================================================
 CACHES = {
     "default": {
-        # Use the django-redis backend.
         "BACKEND": "django_redis.cache.RedisCache",
-        # Connect to the 'redis' service defined in docker-compose.yml on the default port.
-        # The '/1' specifies which Redis database to use (Redis can have multiple).
+        # Connects to the 'redis' service defined in docker-compose.yml.
         "LOCATION": "redis://redis:6379/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
@@ -169,13 +160,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # ==============================================================================
-# MULTI-TENANCY MODEL DEFINITIONS (django-tenants)
+# MULTI-TENANCY MODEL DEFINITIONS
 # ==============================================================================
 
 # --- TENANT MODEL DEFINITION ---
-# Here, we explicitly tell django-tenants which models in our project
+# This explicitly tells django-tenants which models in our project
 # should be used for defining Tenants and their Domains.
-# The format is 'app_label.ModelName'.
 TENANT_MODEL = "store.Tenant"
 TENANT_DOMAIN_MODEL = "store.Domain"
 
@@ -199,35 +189,56 @@ ELASTICSEARCH_DSL = {
 # DJANGO REST FRAMEWORK (DRF) CONFIGURATION
 # ==============================================================================
 REST_FRAMEWORK = {
-    # This sets the default permission policy for all API views.
-    # 'IsAuthenticatedOrReadOnly' allows any user (anonymous or logged in) to view the data (GET requests),
-    # but requires the user to be authenticated for any write actions (POST, PUT, PATCH, DELETE).
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
-    ],
-    # This defines the methods DRF will use to try to authenticate a user.
-    # 'SessionAuthentication' is used for the Browsable API (it uses Django's login session).
-    # 'TokenAuthentication' will be used later for mobile apps or other services.
+    # Sets JWT as the default authentication class.
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
-        # 'rest_framework.authentication.TokenAuthentication', # We will enable this later
     ],
+    # Sets the default permission policy.
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
+# ==============================================================================
+# JWT CONFIGURATION (djangorestframework-simplejwt)
+# ==============================================================================
+SIMPLE_JWT = {
+    # Sets the lifespan of the access token.
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
+    # Sets the lifespan of the refresh token.
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    # Enables token blacklisting on logout.
+    "BLACKLIST_AFTER_ROTATION": True,
+}
+
+# ==============================================================================
+# API DOCUMENTATION CONFIGURATION (drf-spectacular)
+# ==============================================================================
+SPECTACULAR_SETTINGS = {
+    # Sets the title of the OpenAPI documentation page.
+    'TITLE': 'Multi-Tenant E-commerce API',
+    # Describes the purpose of the API.
+    'DESCRIPTION': 'API for managing products, users, and orders in a multi-tenant e-commerce platform.',
+    # Defines the API version.
+    'VERSION': '1.0.0',
+    # Specifies the server URL.
+    'SERVE_URL': 'api/schema/',
 }
 
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
 
-# This logic dynamically finds the host's IP address within the Docker network
-# and adds it to INTERNAL_IPS, allowing the Debug Toolbar to appear.
+# Dynamically finds the host's IP address to allow the Debug Toolbar to appear.
 hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
 INTERNAL_IPS = [ip[: ip.rfind(".")] + ".1" for ip in ips] + ["127.0.0.1"]
 
 # --- EMAIL CONFIGURATION (for development) ---
-# This tells Django to print emails to the console instead of sending them.
+# Tells Django to print emails to the console instead of sending them.
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # --- CELERY CONFIGURATION ---
-# We use Redis as our message broker. Celery tasks are sent to this URL.
+# Uses Redis as the message broker.
 CELERY_BROKER_URL = 'redis://redis:6379/0'
 CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']

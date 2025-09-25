@@ -1,61 +1,52 @@
-# store/urls.py
-from django.urls import path, include
+from django.urls import path
 from . import views
 from django.contrib.auth import views as auth_views
 
-from rest_framework.routers import DefaultRouter
-
 app_name = 'store'
 
-# Create a router and register our viewsets with it.
-router = DefaultRouter()
-router.register(r'products', views.ProductViewSet, basename='product')
-router.register(r'categories', views.CategoryViewSet, basename='category')
-
+# The main URL patterns for the web pages.
 urlpatterns = [
+    # Home and product listing pages
     path('', views.HomePageView.as_view(), name='home'),
     path('products/', views.ProductListView.as_view(), name='product_list'),
+    
+    # Product detail URLs.
+    # The more specific URL pattern with an SKU must come first so Django can match it.
+    path('product/<slug:slug>/<str:sku>/', views.ProductDetailView.as_view(), name='product_detail_variant'),
+    
+    # The generic product detail URL. This is a fallback if no SKU is provided.
     path('product/<slug:slug>/', views.ProductDetailView.as_view(), name='product_detail'),
     
     # Cart URLs
     path('cart/', views.cart_detail, name='cart_detail'),
     path('cart/add/<int:variant_id>/', views.cart_add, name='cart_add'),
-    
-    # --- ADD THESE TWO NEW URLS ---
     path('cart/remove/<int:variant_id>/', views.cart_remove, name='cart_remove'),
-    path('cart/update/<int:variant_id>/', views.cart_update, name='cart_update'),
+    
+    # API URLs for AJAX-based cart updates (Added this section)
+    path('api/cart/update/', views.cart_update, name='cart_update_api'),
+    path('api/cart/remove/', views.cart_remove_api, name='cart_remove_api'),
 
+    # Checkout URL
     path('checkout/', views.checkout, name='checkout'),
 
-    # URL for the user registration page.
+    # User authentication URLs
     path('signup/', views.signup, name='signup'),
-    # Django's built-in LoginView. We just need to tell it which template to use.
     path('login/', auth_views.LoginView.as_view(template_name='store/login.html'), name='login'),
-    # Django's built-in LogoutView. It handles logout and redirects to the homepage.
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
 
-    # URL for the user profile page.
+    # User profile and address management
     path('profile/', views.profile, name='profile'),
-
-    # URL for submitting a review for a specific product.
-    path('product/<slug:slug>/review/', views.submit_review, name='submit_review'),
-
-    # URLs for address management
     path('profile/address/add/', views.add_address, name='add_address'),
     path('profile/address/edit/<int:address_id>/', views.edit_address, name='edit_address'),
     path('profile/address/delete/<int:address_id>/', views.delete_address, name='delete_address'),
+    
+    # Product review URLs
+    path('product/<slug:slug>/review/', views.submit_review, name='submit_review'),
 
-    # URL for the search results page.
+    # Search URL
     path('search/', views.search, name='search'),
 
-    # API-like URLs for dynamic cart updates
-    path('api/cart/update/', views.cart_update_api, name='cart_update_api'),
-    path('api/cart/remove/', views.cart_remove_api, name='cart_remove_api'),
-
-]
-
-# The API URLs are now determined automatically by the router.
-# We add them to our existing urlpatterns.
-urlpatterns += [
-    path('api/', include(router.urls)),
+    # Wishlist URLs
+    path('wishlist/', views.wishlist_view, name='wishlist'),
+    path('add-to-wishlist/<slug:slug>/', views.add_to_wishlist, name='add_to_wishlist'),
 ]

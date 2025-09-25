@@ -1,9 +1,11 @@
-# store/models.py
+# multi_tenant_shop/store/models.py
 
 from django.db import models
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django_tenants.models import TenantMixin, DomainMixin
 from django.conf import settings
+from django.core.validators import MinValueValidator, MaxValueValidator
+
 
 # ==============================================================================
 # MULTI-TENANCY CORE MODELS (SHARED)
@@ -138,11 +140,20 @@ class ProductVariant(models.Model):
     # ImageField stores image files. 'upload_to' specifies the subdirectory
     # within MEDIA_ROOT where the images will be saved.
     image = models.ImageField(upload_to='product_images/', blank=True, null=True)
+    
+    # NEW FIELD: This field will store the cost of the product variant.
+    # It's crucial for calculating profit and loss later in the dashboard.
+    cost_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self):
         return f"{self.product.name} ({self.color or ''} {self.size or ''}) - SKU: {self.sku}"
 
 # --- Order Management Models ---
+
+# multi_tenant_shop/store/models.py
+from django.db import models
+from django.conf import settings
+from .models import Product, ProductVariant
 
 class Order(models.Model):
     """
@@ -160,9 +171,17 @@ class Order(models.Model):
     order_date = models.DateTimeField(auto_now_add=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    
+    # Yeni eklenecek alan:
+    # Bu alan, ödemenin başarılı bir şekilde tamamlandığını doğrular.
+    paid = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Order #{self.id} by {self.user.username if self.user else 'Guest'}"
+
+    # Siparişin toplam maliyetini hesaplayan bir metot
+    def get_total_cost(self):
+        return sum(item.price * item.quantity for item in self.items.all())
 
 class OrderItem(models.Model):
     """
@@ -176,22 +195,35 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return f"{self.quantity} x {self.product_variant.product.name} in Order #{self.order.id}"
-
 # --- User Interaction Models ---
 
 class Review(models.Model):
     """
-    Represents a review and rating left by a user for a product.
+    NEW MODEL: Represents a user's review and rating for a product.
+    This model is crucial for the future AI analysis feature.
     """
+    # Links the review to a user and a product.
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    rating = models.PositiveSmallIntegerField(help_text="Rating from 1 to 5")
+    
+    # Rating field with validators to ensure the value is between 1 and 5.
+    rating = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text="Rating from 1 to 5"
+    )
+    
+    # The actual review text.
     comment = models.TextField()
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        # Prevents a single user from reviewing the same product more than once.
+        unique_together = ('user', 'product')
+        ordering = ['-created_at']
+    
     def __str__(self):
-        return f"Review by {self.user.username} for {self.product.name}"
-
+        return f'Review by {self.user.username} for {self.product.name}'
 
 # --- Inventory & Profitability Models (for future use) ---
 # These models lay the groundwork for tracking purchase costs and calculating profit.
@@ -230,3 +262,20 @@ class PurchaseOrderItem(models.Model):
 
     def __str__(self):
         return f"{self.quantity} x {self.product_variant.sku} @ {self.purchase_price}"
+    
+class Wishlist(models.Model):
+    """
+    Represents a user's wishlist.
+    A user has a single wishlist object which can contain multiple products.
+    This is a more scalable and correct structure for a wishlist.
+    """
+    # Use OneToOneField to ensure each user has only one wishlist.
+    # The 'related_name' allows us to access the wishlist from the user object (e.g., user.wishlist).
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='wishlist')
+
+    # Use ManyToManyField to link the wishlist to multiple products.
+    # The 'related_name' allows us to access the wishlists a product is in (e.g., product.wishlists).
+    products = models.ManyToManyField(Product, related_name='wishlists', blank=True)
+
+    def __str__(self):
+        return f"{self.user.username}'s Wishlist"

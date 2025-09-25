@@ -1,23 +1,31 @@
-    # store/views.py
+# multi_tenant_shop/store/views.py
+
 from django.views.generic import TemplateView, ListView, DetailView 
-from .models import Product, ProductVariant, Order, OrderItem, Review, Address, Category
+from .models import Product, ProductVariant, Order, OrderItem, Review, Address, Category, Wishlist
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from .cart import Cart
 
-from .forms import OrderCreateForm
-
 from .forms import OrderCreateForm, CustomUserCreationForm, ReviewForm
 from django.contrib.auth import login
-
 from django.contrib.auth.decorators import login_required
 
 from .documents import ProductVariantDocument
 
-# --- Dosyanın en üstündeki import satırlarına bunları ekle ---
-from rest_framework import viewsets
-from .serializers import ProductSerializer, CategorySerializer
+# ==============================================================================
+# REST FRAMEWORK & API IMPORTS
+# ==============================================================================
+# We import these for our API endpoints.
+from rest_framework import generics, viewsets
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.response import Response
+from rest_framework import status
+# We import our new serializers to handle data for the API.
+from .serializers import (
+    ProductSerializer, CategorySerializer,
+    UserSerializer, OrderSerializer, AddressSerializer, ReviewSerializer
+)
 
 import stripe
 from django.conf import settings
@@ -27,8 +35,19 @@ from .tasks import send_order_confirmation_email
 from django.http import JsonResponse
 import json
 
-# We use Class-Based Views (CBVs) as they are a professional and reusable way
-# to structure view logic.
+from django.db.models import Avg
+from django.contrib import messages
+from django.http import Http404, HttpResponseRedirect
+from django.urls import reverse
+
+from .models import Product, ProductVariant, Review, Order
+from .forms import ReviewForm
+from .filters import ProductFilter
+
+from django.db.models import F, OuterRef, Subquery, Prefetch
+# ==============================================================================
+# TRADITIONAL DJANGO VIEWS (Web Pages)
+# ==============================================================================
 
 class HomePageView(TemplateView):
     """
@@ -38,72 +57,144 @@ class HomePageView(TemplateView):
 
 class ProductListView(ListView):
     """
-    This view now has a single, simple job: to display a list of
-    all active product variants from the database.
-    All smart searching is now handled by our 'search' view and Elasticsearch.
+    A view to display a list of all active product variants.
+
+    This class queries the `ProductVariant` model directly to show
+    each variant as a separate item. It supports filtering by price,
+    category, and rating, and allows for sorting.
     """
-    model = ProductVariant
+    model = ProductVariant 
     template_name = 'store/product_list.html'
-    context_object_name = 'variants'
-    paginate_by = 12 
+    context_object_name = 'product_variants'
+    paginate_by = 12
 
     def get_queryset(self):
         """
-        We override this to fetch all active variants and optimize the database query.
-        """
-        # We use select_related to prevent extra database queries in the template.
-        return ProductVariant.objects.filter(is_active=True).select_related('product__category')
+        Builds the queryset based on user filters and sorting preferences.
 
+        The queryset starts with all active product variants and uses `select_related`
+        for performance optimization.
+        """
+        # Start by querying the ProductVariant model. `select_related('product')`
+        # fetches the related Product for each variant in a single query,
+        # preventing the N+1 query problem.
+        queryset = ProductVariant.objects.filter(is_active=True).select_related('product')
+        
+        # --- Filtering Logic ---
+        
+        # Filter by price range using the 'sale_price' field of the variant.
+        min_price = self.request.GET.get('min_price')
+        max_price = self.request.GET.get('max_price')
+        if min_price:
+            queryset = queryset.filter(sale_price__gte=min_price)
+        if max_price:
+            queryset = queryset.filter(sale_price__lte=max_price)
+            
+        # Filter by category using the `product__category__slug` lookup.
+        # This links the variant to its parent product's category.
+        category_slug = self.request.GET.get('category')
+        if category_slug:
+            queryset = queryset.filter(product__category__slug=category_slug)
+        
+        # Filter by minimum rating. This requires annotating the queryset
+        # with the average rating from the related Product's reviews.
+        min_rating = self.request.GET.get('min_rating')
+        if min_rating:
+            queryset = queryset.annotate(avg_rating=Avg('product__reviews__rating')).filter(avg_rating__gte=min_rating)
+        
+        # --- Sorting Logic ---
+        
+        sort_by = self.request.GET.get('sort_by')
+        if sort_by == 'price_asc':
+            queryset = queryset.order_by('sale_price')
+        elif sort_by == 'price_desc':
+            queryset = queryset.order_by('-sale_price')
+        elif sort_by == 'rating_desc':
+            # Note: `annotate(avg_rating=...)` is called again here to ensure
+            # sorting works correctly even if no rating filter was applied.
+            queryset = queryset.annotate(avg_rating=Avg('product__reviews__rating')).order_by('-avg_rating')
+        else:
+            # Default sorting by the parent product's name.
+            queryset = queryset.order_by('product__name')
+            
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        """
+        Adds additional context data for the template.
+        """
+        context = super().get_context_data(**kwargs)
+        # Pass the current filter parameters back to the template to pre-fill the form.
+        context['current_filters'] = self.request.GET
+        # Pass all categories to populate the category filter dropdown.
+        context['categories'] = Category.objects.all()
+        return context  
     
 class ProductDetailView(DetailView):
     """
     Handles the logic for displaying a single product page.
     It fetches the main product object based on the URL slug and then gathers
     all related data, such as variants and reviews, to pass to the template.
+    This view also handles POST requests for submitting a product review.
     """
-    model = Product # Let DetailView handle finding the correct Product
+    model = Product 
     template_name = 'store/product_detail.html'
-    # By default, DetailView uses 'slug' from the URL to lookup the object in the 'Product' model.
-    
+
+    def get_object(self, queryset=None):
+        """
+        Retrieves the main Product object based on the slug.
+        This method is critical for Django's DetailView.
+        """
+        return get_object_or_404(Product, slug=self.kwargs['slug'])
+
     def get_context_data(self, **kwargs):
         """
         Overrides the default method to inject additional context data into the template.
+        This includes variants, reviews, the review form, and purchase status.
         """
         context = super().get_context_data(**kwargs)
         product = self.get_object()
         
-        # --- Variant Data ---
-        # Fetch all active variants related to this product.
+        # Prefetching variants to avoid N+1 query problem in the template.
+        # This is an optimization step.
         variants_queryset = product.variants.filter(is_active=True)
         context['variants'] = variants_queryset
 
-        # --- Data for JavaScript ---
+        # --- Logic to Determine the Initial Variant to Display ---
+        # The crucial change is here: get the 'sku' from the URL path, not a query parameter.
+        selected_variant_sku = self.kwargs.get('sku')
+        initial_variant = variants_queryset.first() # Default to the first active variant.
+
+        if selected_variant_sku:
+            try:
+                # Find the variant that matches the SKU from the URL.
+                selected_variant_as_object = variants_queryset.get(sku=selected_variant_sku)
+                initial_variant = selected_variant_as_object
+            except ProductVariant.DoesNotExist:
+                # If the SKU in the URL doesn't match a variant, just keep the default.
+                pass 
+        
+        context['initial_variant'] = initial_variant
+
+        # --- Variant Data for JavaScript ---
+        # It's good practice to pass data for JS separately.
         variants_data_for_js = list(variants_queryset.values(
             'id', 'sku', 'sale_price', 'stock_quantity', 'color', 'size', 'image'
         ))
         context['variants_data_for_js'] = variants_data_for_js
 
-        # --- Logic to Determine the Initial Variant to Display ---
-        selected_variant_id = self.request.GET.get('variant_id')
-        initial_variant = variants_queryset.first() # Default to the first variant.
-
-        if selected_variant_id:
-            try:
-                # Try to find the variant that was clicked from the list page.
-                selected_variant_as_object = variants_queryset.get(id=selected_variant_id)
-                initial_variant = selected_variant_as_object
-            except ProductVariant.DoesNotExist:
-                pass # If invalid ID, just use the default.
-        
-        context['initial_variant'] = initial_variant
-
         # --- Review System Data ---
-        context['reviews'] = product.reviews.all().order_by('-created_at')
+        reviews = product.reviews.all().order_by('-created_at')
+        context['reviews'] = reviews
         context['review_form'] = ReviewForm()
         
+        # Calculate the average rating, if any reviews exist
+        context['average_rating'] = reviews.aggregate(Avg('rating'))['rating__avg']
+
         # --- Purchase Verification for Reviews ---
         has_purchased = False
         if self.request.user.is_authenticated:
+            # Check if the user has purchased this product and the order is delivered or shipped.
             has_purchased = Order.objects.filter(
                 user=self.request.user,
                 status__in=['delivered', 'shipped'],
@@ -112,6 +203,7 @@ class ProductDetailView(DetailView):
         context['has_purchased'] = has_purchased
 
         return context
+
     
 @require_POST
 def cart_add(request, variant_id):
@@ -165,7 +257,7 @@ def checkout(request):
     1. Displaying the address form and Stripe payment element (GET request).
     2. Creating a Stripe PaymentIntent to initiate the payment.
     3. Processing the address form and creating the Order in the database after
-       a successful payment is confirmed on the frontend (POST request).
+        a successful payment is confirmed on the frontend (POST request).
     4. Triggering an asynchronous task to send a confirmation email.
     """
     # Get the user's current cart from the session.
@@ -397,8 +489,12 @@ def search(request):
     return render(request, 'store/search_results.html', context)
 
 
-# --- ProductViewSet sınıfını güncelle ---
-class ProductViewSet(viewsets.ModelViewSet): # ReadOnlyModelViewSet'i ModelViewSet ile değiştir
+# ==============================================================================
+# API VIEWS (DRF Views)
+# These views are for the API and require JWT authentication.
+# ==============================================================================
+
+class ProductViewSet(viewsets.ModelViewSet):
     """
     This ViewSet now provides full 'list', 'create', 'retrieve',
     'update', and 'destroy' actions for Products.
@@ -407,14 +503,121 @@ class ProductViewSet(viewsets.ModelViewSet): # ReadOnlyModelViewSet'i ModelViewS
     serializer_class = ProductSerializer
     lookup_field = 'slug'
 
-# --- CategoryViewSet sınıfını güncelle ---
-class CategoryViewSet(viewsets.ModelViewSet): # ReadOnlyModelViewSet'i ModelViewSet ile değiştir
+class CategoryViewSet(viewsets.ModelViewSet):
     """
     This ViewSet now provides full CRUD actions for Categories.
     """
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     lookup_field = 'slug'
+
+class UserProfileView(generics.RetrieveAPIView):
+    """
+    API endpoint that allows an authenticated user to view their own profile.
+    
+    * Requires a valid JWT token.
+    """
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        """
+        Returns the User instance for the currently authenticated user.
+        """
+        return self.request.user
+
+
+class UserOrderHistoryView(generics.ListAPIView):
+    """
+    API endpoint that lists the authenticated user's order history.
+    
+    * Requires a valid JWT token.
+    """
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Returns the orders placed by the currently authenticated user.
+        """
+        user = self.request.user
+        return Order.objects.filter(user=user).order_by('-order_date')
+
+
+class AddressViewSet(viewsets.ModelViewSet):
+    """
+    A ViewSet for viewing and editing user addresses.
+    
+    * Requires a valid JWT token.
+    * Users can only see and manage their own addresses.
+    """
+    serializer_class = AddressSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Returns the addresses belonging to the authenticated user.
+        """
+        return Address.objects.filter(user=self.request.user)
+    
+    def perform_create(self, serializer):
+        """
+        Automatically sets the user for a new address to the authenticated user.
+        """
+        serializer.save(user=self.request.user)
+
+
+# ==============================================================================
+# PRODUCT REVIEW ENDPOINTS
+# These views handle creation and listing of product reviews.
+# ==============================================================================
+class ProductReviewListView(generics.ListAPIView):
+    """
+    API endpoint to list all reviews for a specific product.
+    
+    * Anyone can view reviews.
+    """
+    serializer_class = ReviewSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly] # Allow anyone to read, but only authenticated users to write.
+
+    def get_queryset(self):
+        """
+        Returns the reviews for the product specified in the URL.
+        The 'product_id' is passed from the URL.
+        """
+        product_id = self.kwargs['product_id']
+        return Review.objects.filter(product_id=product_id)
+
+
+class ProductReviewCreateView(generics.CreateAPIView):
+    """
+    API endpoint to allow an authenticated user to submit a new review for a product.
+    
+    * Requires a valid JWT token.
+    """
+    serializer_class = ReviewSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def perform_create(self, serializer):
+        """
+        Creates a new review, linking it to the authenticated user and the product from the URL.
+        """
+        product_id = self.kwargs['product_id']
+        product = Product.objects.get(id=product_id)
+        serializer.save(user=self.request.user, product=product)
+
+# ==============================================================================
+# API-like Views (Traditional Django Views for JSON response)
+# We keep these for simplicity and to avoid over-engineering.
+# ==============================================================================
+
+# multi_tenant_shop/store/views.py
+from django.shortcuts import render, get_object_or_404, redirect
+from django.views.decorators.http import require_POST
+from django.http import JsonResponse
+import json
+from .cart import Cart
+from .models import ProductVariant # ProductVariant modelini import ettiğinizden emin olun.
 
 
 @require_POST
@@ -433,8 +636,12 @@ def cart_update_api(request):
             return JsonResponse({'error': 'Invalid data'}, status=400)
 
         variant = get_object_or_404(ProductVariant, id=variant_id)
+        # `override_quantity` yerine `update_quantity` kullanmak daha doğru bir adlandırma olabilir
+        # ancak sizin kodunuzda override_quantity varsa onu koruyalım.
         cart.add(variant=variant, quantity=quantity, override_quantity=True)
 
+        # Response data'da item'ın toplam fiyatını da döndürüyoruz.
+        # Bu, frontend'in anında güncelleme yapmasını sağlar.
         response_data = {
             'success': True,
             'cart_total_price': cart.get_total_price(),
@@ -442,7 +649,14 @@ def cart_update_api(request):
             'item_total_price': variant.sale_price * quantity,
         }
         return JsonResponse(response_data)
+    except (ValueError, TypeError):
+        # JSON'dan gelen verinin doğru formatta olmadığı durumlarda.
+        return JsonResponse({'error': 'Invalid data format'}, status=400)
+    except ProductVariant.DoesNotExist:
+        # Belirtilen variant_id ile ürün bulunamazsa.
+        return JsonResponse({'error': 'Product variant not found'}, status=404)
     except Exception as e:
+        # Diğer tüm beklenmedik hatalar.
         return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -462,12 +676,104 @@ def cart_remove_api(request):
         variant = get_object_or_404(ProductVariant, id=variant_id)
         cart.remove(variant)
 
+        # Response data'da sepetin güncel durumunu döndürüyoruz.
         response_data = {
             'success': True,
             'cart_total_price': cart.get_total_price(),
             'cart_total_items': len(cart),
         }
         return JsonResponse(response_data)
+    except (ValueError, TypeError):
+        # JSON'dan gelen verinin doğru formatta olmadığı durumlarda.
+        return JsonResponse({'error': 'Invalid data format'}, status=400)
+    except ProductVariant.DoesNotExist:
+        # Belirtilen variant_id ile ürün bulunamazsa.
+        return JsonResponse({'error': 'Product variant not found'}, status=404)
     except Exception as e:
+        # Diğer tüm beklenmedik hatalar.
         return JsonResponse({'error': str(e)}, status=500)
     
+
+@login_required
+def wishlist_view(request):
+    """
+    Displays the user's wishlist.
+    """
+    # Try to get the user's wishlist. If it doesn't exist, an empty list will be passed.
+    try:
+        wishlist = Wishlist.objects.get(user=request.user)
+    except Wishlist.DoesNotExist:
+        wishlist = None
+        
+    context = {
+        'wishlist': wishlist
+    }
+    return render(request, 'store/wishlist.html', context)
+
+@login_required
+def add_to_wishlist(request, slug):
+    """
+    Adds a product to the user's wishlist using the ManyToMany relationship.
+    It checks if the product is already in the wishlist before adding it.
+    """
+    product = get_object_or_404(Product, slug=slug)
+    
+    # Get or create the user's single wishlist object.
+    # `get_or_create` is an atomic operation and handles race conditions.
+    wishlist, created = Wishlist.objects.get_or_create(user=request.user)
+    
+    # Check if the product is already in the wishlist.
+    # This is the correct way to check with a ManyToMany relationship.
+    if wishlist.products.filter(id=product.id).exists():
+        messages.info(request, "This product is already in your wishlist.")
+    else:
+        # If not, add the product to the wishlist using the `add()` method.
+        wishlist.products.add(product)
+        messages.success(request, f"{product.name} has been added to your wishlist successfully!")
+
+    # Redirect the user back to the product detail page.
+    return redirect('store:product_detail', slug=product.slug)
+
+@login_required
+def submit_review(request, slug):
+    product = get_object_or_404(Product, slug=slug)
+
+    # Check if the user has purchased this product and if the order is paid.
+    has_purchased = OrderItem.objects.filter(
+        order__user=request.user,
+        product_variant__product=product,
+        order__paid=True
+    ).exists()
+
+    if not has_purchased:
+        messages.error(request, "You must purchase this product to leave a review.")
+        return redirect('store:product_detail', slug=product.slug)
+
+    # Check if the user has already submitted a review for this product.
+    try:
+        existing_review = Review.objects.get(user=request.user, product=product)
+        messages.warning(request, "You have already submitted a review for this product.")
+        return redirect('store:product_detail', slug=product.slug)
+    except Review.DoesNotExist:
+        existing_review = None
+
+    if request.method == 'POST':
+        form = ReviewForm(request.POST)
+        if form.is_valid():
+            new_review = form.save(commit=False)
+            new_review.user = request.user
+            new_review.product = product
+            new_review.save()
+            messages.success(request, 'Your review has been submitted successfully!')
+            return redirect('store:product_detail', slug=product.slug)
+        else:
+            messages.error(request, 'Please fill out the form correctly.')
+    else:
+        form = ReviewForm()
+
+    context = {
+        'form': form,
+        'product': product,
+    }
+    return render(request, 'store/submit_review.html', context)
+

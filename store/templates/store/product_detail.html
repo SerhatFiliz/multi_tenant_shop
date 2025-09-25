@@ -1,4 +1,3 @@
-<!-- store/templates/store/product_detail.html -->
 {% extends "base.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
@@ -7,7 +6,6 @@
 <div class="container mt-5">
     <div class="row">
         <div class="col-md-6">
-            <!-- We use the initial_variant to display the correct starting image. -->
             <img src="{% if initial_variant.image %}{{ initial_variant.image.url }}{% else %}https://placehold.co/600x450/EFEFEF/AAAAAA?text=Resim+Yok{% endif %}" 
                  class="img-fluid rounded border" 
                  id="main-image" 
@@ -20,18 +18,12 @@
             <p>{{ product.description }}</p>
             <hr>
 
-            <!-- ============================================================================== -->
-            <!--   THIS IS THE MAIN FIX: We wrap everything that depends on variants            -->
-            <!--   inside an 'if' block to prevent errors when no variants exist.             -->
-            <!-- ============================================================================== -->
             {% if initial_variant %}
                 
-                <!-- Variant-specific details -->
                 <h3 id="variant-price" class="mb-3">{{ initial_variant.sale_price|stringformat:".2f" }} TL</h3>
                 <p class="mb-1"><strong>SKU:</strong> <span id="variant-sku">{{ initial_variant.sku }}</span></p>
                 <p><strong>Stok Durumu:</strong> <span id="variant-stock">{{ initial_variant.stock_quantity }}</span> adet</p>
 
-                <!-- Add to Cart Form -->
                 <form action="{% url 'store:cart_add' variant_id=initial_variant.id %}" method="post" id="add-to-cart-form">
                     {% csrf_token %}
                     <div class="my-4">
@@ -42,7 +34,7 @@
                                 <input class="form-check-input variant-selector" type="radio" name="variant_option" 
                                        id="variant-{{ variant.id }}" value="{{ variant.id }}" {% if variant.id == initial_variant.id %}checked{% endif %}>
                                 <label class="form-check-label" for="variant-{{ variant.id }}">
-                                    {{ variant.color }}
+                                    {{ variant.color }} {{ variant.size }}
                                 </label>
                             </div>
                             {% endfor %}
@@ -52,24 +44,63 @@
                 </form>
 
             {% else %}
-                <!-- This message is shown if the product has no active variants. -->
                 <div class="alert alert-warning mt-4" role="alert">
                     Bu ürün geçici olarak stoklarımızda mevcut değildir.
                 </div>
             {% endif %}
-            <!-- End of the main 'if' block -->
+            {% if request.user.is_authenticated %}
+                <a href="{% url 'store:add_to_wishlist' slug=product.slug %}" class="btn btn-outline-secondary mt-3">
+                    <i class="fas fa-heart"></i> İstek Listesine Ekle
+                </a>
+            {% endif %}
+
         </div>
     </div>
+    
+    <hr>
+    
+    <div class="reviews-section mt-5">
+        <h3>Müşteri Yorumları</h3>
+        
+        {% if average_rating %}
+            <p><strong>Ortalama Puan:</strong> {{ average_rating|floatformat:1 }}/5</p>
+        {% else %}
+            <p>Henüz yorum yok.</p>
+        {% endif %}
+        
+        <div class="existing-reviews mt-3">
+            {% for review in reviews %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ review.user.username }}</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">Puan: {{ review.rating }}/5</h6>
+                        <p class="card-text">{{ review.comment }}</p>
+                        <small class="text-muted">Paylaşım Tarihi: {{ review.created_at|date:"F d, Y" }}</small>
+                    </div>
+                </div>
+            {% empty %}
+                <p>İlk yorumu yapan sen ol!</p>
+            {% endfor %}
+        </div>
 
-    <!-- REVIEWS SECTION (No changes here) -->
-    <div class="row mt-5">
-        <!-- ... (Yorumlar bölümü olduğu gibi kalacak) ... -->
+        <hr>
+
+        {% if request.user.is_authenticated %}
+            <div class="review-form mt-4">
+                <h4>Yorum Yap</h4>
+                <form action="{% url 'store:product_detail' slug=product.slug %}" method="post">
+                    {% csrf_token %}
+                    {{ review_form|crispy }}
+                    <button type="submit" class="btn btn-primary">Yorumu Gönder</button>
+                </form>
+            </div>
+        {% else %}
+            <p class="text-info">Yorum yapmak için lütfen <a href="{% url 'store:login' %}">giriş yapın</a>.</p>
+        {% endif %}
     </div>
+
 </div>
 
-<!-- ============================================================================== -->
-<!-- JAVASCRIPT SECTION (No changes needed, but must be inside the content block) -->
-<!-- ============================================================================== -->
 {% if initial_variant %}
 <script>
     // Script 1: Updates the form's ACTION URL
@@ -123,7 +154,6 @@
     });
 </script>
 
-<!-- Hidden script tag for data -->
 {{ variants_data_for_js|json_script:"variants-data" }}
 {% endif %}
 
