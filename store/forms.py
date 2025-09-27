@@ -68,3 +68,15 @@ class ReviewForm(forms.ModelForm):
             'comment': 'Yorumunuz',
         }
         
+        
+class CheckoutForm(forms.Form):
+    """
+    Form for collecting customer information during checkout.
+    """
+    first_name = forms.CharField(label="Ad", max_length=100)
+    last_name = forms.CharField(label="Soyad", max_length=100)
+    email = forms.EmailField(label="E-posta Adresi")
+    phone_number = forms.CharField(label="Telefon Numarası", max_length=15, required=False)
+    address = forms.CharField(label="Adres", widget=forms.Textarea)
+    city = forms.CharField(label="Şehir", max_length=100)
+    zip_code = forms.CharField(label="Posta Kodu", max_length=10)

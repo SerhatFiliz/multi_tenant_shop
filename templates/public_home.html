@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="text-center mt-5">
+        <h1>Welcome to the Multi-Tenant Marketplace!</h1>
+    <p class="lead">Find products from all our unique stores or start selling today.</p>
+</div>
+
+<div class="row mt-5">
+    <div class="col-12">
+        <h3 class="mb-4">Featured Products Across the Platform</h3>
+        <div class="alert alert-info" role="alert">
+            **Product Aggregation Note:** The content of this page is expected to be rendered by the `store:product_list` view, which should be configured to fetch and display products from all tenants when running on the Public Schema.
+        </div>
+    </div>
+</div>
+
+{% endblock content %}

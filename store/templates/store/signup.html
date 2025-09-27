@@ -1,16 +1,43 @@
 {% extends "base.html" %}
-{% load crispy_forms_tags %} {% block content %}
+{% load crispy_forms_tags %} 
+
+{% block content %}
+<!-- Customer Signup Page Container -->
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-md-6">
-            <div class="card">
+            <div class="card shadow">
                 <div class="card-body">
-                    <h2 class="card-title text-center">Kayıt Ol</h2>
+                    <!-- Signup Title -->
+                    <h2 class="card-title text-center">Customer Sign Up</h2>
+                    
+                    <!-- Customer Signup Form -->
                     <form method="post">
                         {% csrf_token %}
+                        <!-- Render the form fields using crispy forms -->
                         {{ form|crispy }}
-                        <button type="submit" class="btn btn-primary w-100 mt-3">Hesap Oluştur</button>
+                        <!-- Submit button for customer registration -->
+                        <button type="submit" class="btn btn-primary w-100 mt-3">Create Account</button>
                     </form>
+                    
+                    <!-- Customer Login Link -->
+                    <div class="text-center mt-3">
+                        <a href="{% url 'store:login' %}">Already have an account? Log In</a>
+                    </div>
+
+                    <hr>
+                    
+                    <!-- START: Store Manager / Tenant Link -->
+                    <!-- Provides a path for customers to become tenants -->
+                    <div class="text-center mt-3">
+                        <p class="mb-2 text-muted">Want to start selling?</p>
+                        <!-- Link to the public Tenant Registration page (store_management:register) -->
+                        <a href="{% url 'store_management:register' %}" class="btn btn-outline-dark btn-sm">
+                            Open Your Store Now
+                        </a>
+                    </div>
+                    <!-- END: Store Manager / Tenant Link -->
+                    
                 </div>
             </div>
         </div>

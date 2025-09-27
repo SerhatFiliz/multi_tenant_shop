@@ -1,11 +1,29 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="p-5 mb-4 bg-light rounded-3">
-    <div class="container-fluid py-5">
-        <h1 class="display-5 fw-bold">İnci Boncuk Tuhafiye'ye Hoş Geldiniz!</h1>
-        <p class="col-md-8 fs-4">Hayalinizdeki takıları ve tasarımları yaratmak için en kaliteli malzemeler burada.</p>
-        <a href="{% url 'store:product_list' %}" class="btn btn-primary btn-lg" type="button">Ürünleri Keşfet</a>
+<div class="text-center mt-5">
+    <!-- 
+    DYNAMIC TITLE: 
+    This view should only be loaded when a tenant is active. 
+    It now uses the 'current_tenant' object to display the store's name dynamically.
+    -->
+    
+    <h1>Welcome to {{ current_tenant.name }}!</h1>
+    
+    <p class="lead">Discover the unique collection we have prepared for you.</p>
+
+    <!-- Products link -->
+    <a href="{% url 'store:product_list' %}" class="btn btn-primary btn-lg mt-4">Explore Products</a>
+</div>
+
+<!-- Placeholder for product listings specific to this store -->
+<div class="row mt-5">
+    <div class="col-12">
+        <h3 class="mb-4 text-center">Featured Items</h3>
+        <div class="alert alert-secondary text-center" role="alert">
+            **No Products Found:** This space is reserved for featured products belonging to the {{ current_tenant.name }} store.
+        </div>
     </div>
 </div>
+
 {% endblock content %}

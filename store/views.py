@@ -45,6 +45,9 @@ from .forms import ReviewForm
 from .filters import ProductFilter
 
 from django.db.models import F, OuterRef, Subquery, Prefetch
+
+from .forms import ReviewForm, CheckoutForm
+
 # ==============================================================================
 # TRADITIONAL DJANGO VIEWS (Web Pages)
 # ==============================================================================
@@ -249,31 +252,30 @@ def cart_update(request, variant_id):
         
     return redirect('store:cart_detail')
 
-# The @login_required decorator ensures that only authenticated users can access this page.
 @login_required
 def checkout(request):
     """
     Handles the entire checkout process, including:
     1. Displaying the address form and Stripe payment element (GET request).
     2. Creating a Stripe PaymentIntent to initiate the payment.
-    3. Processing the address form and creating the Order in the database after
-        a successful payment is confirmed on the frontend (POST request).
-    4. Triggering an asynchronous task to send a confirmation email.
+    3. Processing the address form and creating the Order in the database (POST request).
     """
     # Get the user's current cart from the session.
     cart = Cart(request)
-    # Set the Stripe API secret key from our settings.
-    stripe.api_key = settings.STRIPE_SECRET_KEY
 
-    # This block handles the form submission, which is now triggered by our frontend JavaScript
-    # ONLY AFTER a successful payment confirmation from Stripe.
+    # If the cart is empty, redirect them back to the cart page with a warning.
+    if not cart:
+        messages.warning(request, "Your cart is empty. Please add some products to checkout.")
+        return redirect('store:cart_detail')
+        
+    # This block handles the form submission, which is now triggered by our frontend JavaScript.
     if request.method == 'POST':
         # Create a form instance and populate it with the submitted data.
-        form = OrderCreateForm(request.POST)
+        form = CheckoutForm(request.POST)
         
         # Check if the submitted address data is valid.
         if form.is_valid():
-            # Save the form data to create a new Address object, but don't commit to the DB yet.
+            # Save the form data to create a new Address object.
             address = form.save(commit=False)
             # Associate the new address with the currently logged-in user.
             address.user = request.user
@@ -281,10 +283,12 @@ def checkout(request):
             address.save()
 
             # Create the main Order object in the database.
+            # It's not paid yet, as we need to verify the Stripe payment webhook.
             order = Order.objects.create(
                 user=request.user,
                 shipping_address=address,
-                total_amount=cart.get_total_price()
+                total_amount=cart.get_total_price(),
+                paid=False # Initially, the order is not paid.
             )
 
             # Loop through every item in the cart to create individual OrderItem records.
@@ -298,34 +302,34 @@ def checkout(request):
             
             # The order is successfully created, so clear the user's cart from the session.
             cart.clear()
-
-            # --- THIS IS THE NEW CELERY INTEGRATION ---
-            # Instead of calling the email function directly and making the user wait,
-            # we call .delay(). This sends the task (and the order ID) to our Celery queue.
-            # A separate 'worker' process will pick up this job and execute it in the background.
-            send_order_confirmation_email.delay(order.id)
             
+            messages.success(request, 'Your order has been placed successfully!')
             # Redirect the user to their profile page where they can see their new order.
             return redirect('store:profile')
+        else:
+            # If the form is not valid, re-render the page with the form errors.
+            messages.error(request, 'Please correct the errors in the form.')
     
     # This block handles the initial page load (GET request).
     else:
         # Create a blank instance of our address form.
-        form = OrderCreateForm()
+        form = CheckoutForm()
         intent = None # Initialize the payment intent as None.
         
         # Only attempt to create a Stripe PaymentIntent if the cart has items.
         if cart.get_total_price() > 0:
             try:
                 # Create a PaymentIntent object on Stripe's servers.
-                # This represents the payment session.
+                # This object represents the payment session and contains the client_secret.
                 intent = stripe.PaymentIntent.create(
-                    amount=int(cart.get_total_price() * 100), # Amount must be in the smallest currency unit (kuruş).
+                    amount=int(cart.get_total_price() * 100), # Amount must be in the smallest currency unit (e.g., cents).
                     currency='try',
                     automatic_payment_methods={'enabled': True},
+                    metadata={'order_id': order.id} # Link this intent to our new order
                 )
             except stripe.error.StripeError as e:
-                # If Stripe returns an error (e.g., amount is too low), print it to the server console.
+                # If Stripe returns an error, display it to the user.
+                messages.error(request, f"Stripe Error: {e}")
                 print(f"Stripe Error: {e}")
         
     # Prepare the context dictionary to pass data to the template.
@@ -333,8 +337,8 @@ def checkout(request):
         'cart': cart,
         'form': form,
         'stripe_publishable_key': settings.STRIPE_PUBLISHABLE_KEY,
-        # The client_secret is the temporary key that authorizes the frontend
-        # JavaScript to confirm this specific payment with Stripe.
+        # The client_secret is a temporary key that authorizes the frontend JavaScript
+        # to confirm this specific payment with Stripe.
         'client_secret': intent.client_secret if intent else None,
     }
     # Render the checkout page template with the prepared context.
@@ -372,43 +376,61 @@ def profile(request):
     }
     return render(request, 'store/profile.html', context)
 
-@login_required # Only logged-in users can submit reviews.
+@login_required
 def submit_review(request, slug):
+    """
+    Handles review submission for a product.
+    Only allows users who have a paid order for the product to submit a review.
+    """
     # Find the product that the user is trying to review.
     product = get_object_or_404(Product, slug=slug)
-    
-    # --- CRITICAL LOGIC: Check if the user has purchased this product ---
-    # We check if there is any completed order ('delivered' or 'shipped')
-    # for the current user that contains this specific product.
-    has_purchased = Order.objects.filter(
-        user=request.user,
-        status__in=['delivered', 'shipped'], # Check against multiple statuses
-        items__product_variant__product=product
+
+    # Check if the user has purchased this product and if the order is paid.
+    has_purchased = OrderItem.objects.filter(
+        order__user=request.user,
+        product_variant__product=product,
+        order__paid=True
     ).exists()
 
     if not has_purchased:
-        # If the user has not purchased the item, redirect them back.
-        # We should add a Django message here later to inform the user.
-        return redirect('store:product_detail', slug=slug)
+        messages.error(request, "You must purchase this product to leave a review.")
+        return redirect('store:product_detail', slug=product.slug)
+    
+    # Check if the user has already submitted a review for this product.
+    # This prevents a user from leaving multiple reviews for the same product.
+    try:
+        existing_review = Review.objects.get(user=request.user, product=product)
+        messages.warning(request, "You have already submitted a review for this product.")
+        return redirect('store:product_detail', slug=product.slug)
+    except Review.DoesNotExist:
+        existing_review = None
 
     if request.method == 'POST':
         form = ReviewForm(request.POST)
         if form.is_valid():
-            # Create the review object in memory.
-            review = form.save(commit=False)
+            # Create the review object in memory without saving yet.
+            new_review = form.save(commit=False)
             # Assign the current product and user to the review.
-            review.product = product
-            review.user = request.user
+            new_review.user = request.user
+            new_review.product = product
             # Save the complete review object to the database.
-            review.save()
+            new_review.save()
+            messages.success(request, 'Your review has been submitted successfully!')
             # Redirect back to the product detail page to see the new review.
-            return redirect('store:product_detail', slug=slug)
+            return redirect('store:product_detail', slug=product.slug)
+        else:
+            messages.error(request, 'Please fill out the form correctly.')
+            form = ReviewForm() # Re-instantiate the form to show errors
     else:
         form = ReviewForm()
 
-    # Pass the purchase status to the template to conditionally show the form.
-    return render(request, 'store/product_detail.html', {'form': form, 'product': product, 'has_purchased': has_purchased})
-
+    # Pass the form and product to the template. The `has_purchased` check
+    # is handled before this point.
+    context = {
+        'form': form,
+        'product': product,
+    }
+    return render(request, 'store/submit_review.html', context)
 
 @login_required
 def add_address(request):
@@ -611,14 +633,10 @@ class ProductReviewCreateView(generics.CreateAPIView):
 # We keep these for simplicity and to avoid over-engineering.
 # ==============================================================================
 
-# multi_tenant_shop/store/views.py
-from django.shortcuts import render, get_object_or_404, redirect
-from django.views.decorators.http import require_POST
-from django.http import JsonResponse
-import json
-from .cart import Cart
-from .models import ProductVariant # ProductVariant modelini import ettiğinizden emin olun.
+# Set up Stripe with your secret key
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
+# --- API VIEWS FOR CART MANAGEMENT (AJAX) ---
 
 @require_POST
 def cart_update_api(request):
@@ -636,12 +654,10 @@ def cart_update_api(request):
             return JsonResponse({'error': 'Invalid data'}, status=400)
 
         variant = get_object_or_404(ProductVariant, id=variant_id)
-        # `override_quantity` yerine `update_quantity` kullanmak daha doğru bir adlandırma olabilir
-        # ancak sizin kodunuzda override_quantity varsa onu koruyalım.
+        # `override_quantity` replaces the existing item quantity.
         cart.add(variant=variant, quantity=quantity, override_quantity=True)
 
-        # Response data'da item'ın toplam fiyatını da döndürüyoruz.
-        # Bu, frontend'in anında güncelleme yapmasını sağlar.
+        # The response data includes the updated cart totals and the specific item's new total.
         response_data = {
             'success': True,
             'cart_total_price': cart.get_total_price(),
@@ -650,13 +666,13 @@ def cart_update_api(request):
         }
         return JsonResponse(response_data)
     except (ValueError, TypeError):
-        # JSON'dan gelen verinin doğru formatta olmadığı durumlarda.
+        # Catches errors if the JSON data is improperly formatted.
         return JsonResponse({'error': 'Invalid data format'}, status=400)
     except ProductVariant.DoesNotExist:
-        # Belirtilen variant_id ile ürün bulunamazsa.
+        # Catches errors if the specified product variant is not found.
         return JsonResponse({'error': 'Product variant not found'}, status=404)
     except Exception as e:
-        # Diğer tüm beklenmedik hatalar.
+        # Catches any other unexpected errors.
         return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -676,7 +692,7 @@ def cart_remove_api(request):
         variant = get_object_or_404(ProductVariant, id=variant_id)
         cart.remove(variant)
 
-        # Response data'da sepetin güncel durumunu döndürüyoruz.
+        # The response data includes the updated cart totals.
         response_data = {
             'success': True,
             'cart_total_price': cart.get_total_price(),
@@ -684,13 +700,10 @@ def cart_remove_api(request):
         }
         return JsonResponse(response_data)
     except (ValueError, TypeError):
-        # JSON'dan gelen verinin doğru formatta olmadığı durumlarda.
         return JsonResponse({'error': 'Invalid data format'}, status=400)
     except ProductVariant.DoesNotExist:
-        # Belirtilen variant_id ile ürün bulunamazsa.
         return JsonResponse({'error': 'Product variant not found'}, status=404)
     except Exception as e:
-        # Diğer tüm beklenmedik hatalar.
         return JsonResponse({'error': str(e)}, status=500)
     
 
