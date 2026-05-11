@@ -1,18 +1,161 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="text-center mt-5">
-        <h1>Welcome to the Multi-Tenant Marketplace!</h1>
-    <p class="lead">Find products from all our unique stores or start selling today.</p>
-</div>
 
-<div class="row mt-5">
-    <div class="col-12">
-        <h3 class="mb-4">Featured Products Across the Platform</h3>
-        <div class="alert alert-info" role="alert">
-            **Product Aggregation Note:** The content of this page is expected to be rendered by the `store:product_list` view, which should be configured to fetch and display products from all tenants when running on the Public Schema.
+<!-- ================================================================
+     HERO SECTION
+================================================================ -->
+<section style="text-align:center; padding: 5rem 1rem 4rem; position:relative; overflow:hidden;">
+    <!-- Background glow orbs -->
+    <div style="position:absolute;top:-80px;left:50%;transform:translateX(-50%);width:600px;height:600px;border-radius:50%;background:radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);pointer-events:none;"></div>
+
+    <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.25);border-radius:50px;padding:6px 16px;font-size:0.8125rem;color:#818cf8;margin-bottom:2rem;">
+        <i data-lucide="zap" width="14" height="14"></i>
+        Powered by Gemini AI &nbsp;·&nbsp; Multi-Tenant SaaS Platform
+    </div>
+
+    <h1 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:clamp(2.25rem,5vw,3.75rem);font-weight:900;line-height:1.1;margin-bottom:1.5rem;max-width:800px;margin-left:auto;margin-right:auto;">
+        AI-Powered E-Commerce<br>
+        <span class="gradient-text">for the Next Generation</span>
+    </h1>
+
+    <p style="color:var(--text-secondary);font-size:1.125rem;max-width:560px;margin:0 auto 2.5rem;line-height:1.7;">
+        Launch your own AI-assisted storefront in minutes. Every store gets an intelligent assistant, real-time analytics, and seamless multi-tenant isolation.
+    </p>
+
+    <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+        <a href="{% url 'store_management:register' %}" class="btn-nexus-primary" style="font-size:1rem;padding:14px 32px;">
+            <i data-lucide="rocket" width="16" height="16" style="margin-right:8px;"></i>Open Your Store
+        </a>
+        <a href="{% url 'store:product_list' %}" class="btn-nexus-ghost" style="font-size:1rem;padding:14px 32px;">
+            Explore Marketplace
+        </a>
+    </div>
+</section>
+
+<!-- ================================================================
+     PLATFORM ANALYTICS STATS
+================================================================ -->
+<section style="margin:3rem 0;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
+
+        <div class="nexus-card" style="padding:1.75rem;text-align:center;">
+            <div style="width:48px;height:48px;border-radius:12px;background:rgba(99,102,241,0.15);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+                <i data-lucide="store" width="22" height="22" style="color:#818cf8;"></i>
+            </div>
+            <div style="font-size:2rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;" class="gradient-text">Multi</div>
+            <div style="color:var(--text-secondary);font-size:0.875rem;margin-top:4px;">Tenant Architecture</div>
+        </div>
+
+        <div class="nexus-card" style="padding:1.75rem;text-align:center;">
+            <div style="width:48px;height:48px;border-radius:12px;background:rgba(6,182,212,0.15);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+                <i data-lucide="bot" width="22" height="22" style="color:#22d3ee;"></i>
+            </div>
+            <div style="font-size:2rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:#22d3ee;">AI</div>
+            <div style="color:var(--text-secondary);font-size:0.875rem;margin-top:4px;">Gemini-Powered Chat</div>
+        </div>
+
+        <div class="nexus-card" style="padding:1.75rem;text-align:center;">
+            <div style="width:48px;height:48px;border-radius:12px;background:rgba(139,92,246,0.15);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+                <i data-lucide="shield-check" width="22" height="22" style="color:#a78bfa;"></i>
+            </div>
+            <div style="font-size:2rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:#a78bfa;">B2B</div>
+            <div style="color:var(--text-secondary);font-size:0.875rem;margin-top:4px;">Enterprise-Grade Security</div>
+        </div>
+
+        <div class="nexus-card" style="padding:1.75rem;text-align:center;">
+            <div style="width:48px;height:48px;border-radius:12px;background:rgba(16,185,129,0.15);display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">
+                <i data-lucide="trending-up" width="22" height="22" style="color:#34d399;"></i>
+            </div>
+            <div style="font-size:2rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:#34d399;">SaaS</div>
+            <div style="color:var(--text-secondary);font-size:0.875rem;margin-top:4px;">Scalable Infrastructure</div>
+        </div>
+
+    </div>
+</section>
+
+<!-- ================================================================
+     FEATURE GRID
+================================================================ -->
+<section style="margin:4rem 0;">
+    <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.75rem;font-weight:800;text-align:center;margin-bottom:0.75rem;">
+        Everything You Need to <span class="gradient-text">Sell Smarter</span>
+    </h2>
+    <p style="color:var(--text-secondary);text-align:center;margin-bottom:2.5rem;font-size:0.9375rem;">Built-in AI, analytics, and enterprise tooling — ready from day one.</p>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+
+        <div class="nexus-card" style="padding:2rem;">
+            <div style="width:44px;height:44px;border-radius:10px;background:rgba(99,102,241,0.15);display:flex;align-items:center;justify-content:center;margin-bottom:1.25rem;">
+                <i data-lucide="message-square" width="20" height="20" style="color:#818cf8;"></i>
+            </div>
+            <h3 style="font-weight:700;font-size:1.0625rem;margin-bottom:0.5rem;">KOBI-AI Chat Widget</h3>
+            <p style="color:var(--text-secondary);font-size:0.875rem;line-height:1.6;">Every storefront gets an embedded Gemini-powered chat assistant that handles product queries, order tracking, and recommendations in real time.</p>
+        </div>
+
+        <div class="nexus-card" style="padding:2rem;">
+            <div style="width:44px;height:44px;border-radius:10px;background:rgba(6,182,212,0.15);display:flex;align-items:center;justify-content:center;margin-bottom:1.25rem;">
+                <i data-lucide="layers" width="20" height="20" style="color:#22d3ee;"></i>
+            </div>
+            <h3 style="font-weight:700;font-size:1.0625rem;margin-bottom:0.5rem;">Schema Isolation</h3>
+            <p style="color:var(--text-secondary);font-size:0.875rem;line-height:1.6;">Each tenant's data lives in its own PostgreSQL schema. Complete data isolation with no cross-contamination and shared infrastructure efficiency.</p>
+        </div>
+
+        <div class="nexus-card" style="padding:2rem;">
+            <div style="width:44px;height:44px;border-radius:10px;background:rgba(139,92,246,0.15);display:flex;align-items:center;justify-content:center;margin-bottom:1.25rem;">
+                <i data-lucide="search" width="20" height="20" style="color:#a78bfa;"></i>
+            </div>
+            <h3 style="font-weight:700;font-size:1.0625rem;margin-bottom:0.5rem;">Elasticsearch Search</h3>
+            <p style="color:var(--text-secondary);font-size:0.875rem;line-height:1.6;">Full-text search powered by Elasticsearch, with filters, category facets, and price range queries delivering instant results at any scale.</p>
+        </div>
+
+        <div class="nexus-card" style="padding:2rem;">
+            <div style="width:44px;height:44px;border-radius:10px;background:rgba(16,185,129,0.15);display:flex;align-items:center;justify-content:center;margin-bottom:1.25rem;">
+                <i data-lucide="credit-card" width="20" height="20" style="color:#34d399;"></i>
+            </div>
+            <h3 style="font-weight:700;font-size:1.0625rem;margin-bottom:0.5rem;">Stripe Payments</h3>
+            <p style="color:var(--text-secondary);font-size:0.875rem;line-height:1.6;">Integrated Stripe checkout with webhook processing. Accept payments, handle refunds, and manage subscriptions out of the box.</p>
+        </div>
+
+        <div class="nexus-card" style="padding:2rem;">
+            <div style="width:44px;height:44px;border-radius:10px;background:rgba(245,158,11,0.15);display:flex;align-items:center;justify-content:center;margin-bottom:1.25rem;">
+                <i data-lucide="bar-chart-3" width="20" height="20" style="color:#fbbf24;"></i>
+            </div>
+            <h3 style="font-weight:700;font-size:1.0625rem;margin-bottom:0.5rem;">Store Analytics</h3>
+            <p style="color:var(--text-secondary);font-size:0.875rem;line-height:1.6;">Track revenue, best-selling products, customer behavior, and AI-driven insights through a dedicated store management dashboard.</p>
+        </div>
+
+        <div class="nexus-card" style="padding:2rem;">
+            <div style="width:44px;height:44px;border-radius:10px;background:rgba(239,68,68,0.15);display:flex;align-items:center;justify-content:center;margin-bottom:1.25rem;">
+                <i data-lucide="webhook" width="20" height="20" style="color:#f87171;"></i>
+            </div>
+            <h3 style="font-weight:700;font-size:1.0625rem;margin-bottom:0.5rem;">Webhook Events</h3>
+            <p style="color:var(--text-secondary);font-size:0.875rem;line-height:1.6;">Universal webhook receiver in the FastAPI SaaS Brain. Connect any third-party service or trigger AI automation on any platform event.</p>
+        </div>
+
+    </div>
+</section>
+
+<!-- ================================================================
+     CALL-TO-ACTION BANNER
+================================================================ -->
+<section style="margin:4rem 0;">
+    <div class="nexus-card" style="padding:3.5rem 2rem;text-align:center;background:linear-gradient(135deg,rgba(99,102,241,0.12) 0%,rgba(139,92,246,0.08) 50%,rgba(6,182,212,0.08) 100%);border-color:rgba(99,102,241,0.2);">
+        <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.875rem;font-weight:800;margin-bottom:1rem;">
+            Ready to Launch Your AI Store?
+        </h2>
+        <p style="color:var(--text-secondary);font-size:1rem;margin-bottom:2rem;max-width:480px;margin-left:auto;margin-right:auto;">
+            Join the platform and get a fully equipped storefront with built-in AI assistance, analytics, and enterprise tooling.
+        </p>
+        <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+            <a href="{% url 'store_management:register' %}" class="btn-nexus-primary" style="font-size:0.9375rem;padding:12px 28px;">
+                <i data-lucide="arrow-right" width="16" height="16" style="margin-right:6px;"></i>Get Started Free
+            </a>
+            <a href="{% url 'store_management:login' %}" class="btn-nexus-ghost" style="font-size:0.9375rem;padding:12px 28px;">
+                Manage My Store
+            </a>
         </div>
     </div>
-</div>
+</section>
 
 {% endblock content %}

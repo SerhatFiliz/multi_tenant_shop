@@ -1,0 +1,333 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Nexus-Admin Dashboard{% endblock %}
+
+{% block extra_head %}
+<!-- Plus Jakarta Sans & Inter Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- TailwindCSS via CDN for layout if not present -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- ApexCharts -->
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<!-- Lucide Icons -->
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<style>
+    body {
+        font-family: 'Inter', sans-serif;
+        background-color: #0f172a; /* Tailwind slate-900 */
+        color: #f8fafc; /* Tailwind slate-50 */
+    }
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .glass-card {
+        background: rgba(30, 41, 59, 0.7);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-white mb-2">Nexus-Admin Dashboard</h1>
+            <p class="text-slate-400">Welcome to your store's command center.</p>
+        </div>
+        <button id="campaign-btn" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 px-4 rounded-lg flex items-center gap-2 transition-all">
+            <i data-lucide="sparkles"></i> AI Campaign Generator
+        </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <!-- Finance Card -->
+        <div class="glass-card p-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="p-3 bg-emerald-500/20 text-emerald-400 rounded-lg">
+                    <i data-lucide="dollar-sign"></i>
+                </div>
+                <h3 class="text-xl font-semibold">Monthly Revenue</h3>
+            </div>
+            <p class="text-3xl font-bold mb-2" id="monthly-revenue">Loading...</p>
+            <p class="text-sm text-emerald-400 flex items-center gap-1">
+                <i data-lucide="trending-up" class="w-4 h-4"></i> +12% from last month
+            </p>
+        </div>
+
+        <!-- Profit/Loss Card -->
+        <div class="glass-card p-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="p-3 bg-blue-500/20 text-blue-400 rounded-lg">
+                    <i data-lucide="pie-chart"></i>
+                </div>
+                <h3 class="text-xl font-semibold">Profit/Loss</h3>
+            </div>
+            <p class="text-3xl font-bold mb-2" id="profit-loss">Loading...</p>
+            <p class="text-sm text-slate-400">After expenses</p>
+        </div>
+
+        <!-- Orders Card -->
+        <div class="glass-card p-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="p-3 bg-purple-500/20 text-purple-400 rounded-lg">
+                    <i data-lucide="shopping-bag"></i>
+                </div>
+                <h3 class="text-xl font-semibold">Total Orders</h3>
+            </div>
+            <p class="text-3xl font-bold mb-2">{{ total_orders }}</p>
+            <p class="text-sm text-slate-400">Across all time</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Chart -->
+        <div class="glass-card p-6 lg:col-span-2">
+            <h3 class="text-xl font-semibold mb-4">Revenue Trend (30 Days)</h3>
+            <div id="revenue-chart"></div>
+        </div>
+
+        <!-- AI Insights & Smart Alerts -->
+        <div class="flex flex-col gap-6">
+            <!-- Executive Summary -->
+            <div class="glass-card p-6 flex-grow">
+                <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                    <i data-lucide="brain" class="text-indigo-400"></i> AI Executive Summary
+                </h3>
+                <div id="ai-summary" class="text-slate-300 leading-relaxed text-sm">
+                    Connecting to AI Brain...
+                </div>
+            </div>
+            
+            <!-- Smart Alerts -->
+            <div id="smart-alerts" class="glass-card p-6 border border-red-500/50 bg-red-900/20 hidden">
+                <h3 class="text-lg font-semibold mb-3 text-red-400 flex items-center gap-2">
+                    <i data-lucide="alert-triangle"></i> Action Required
+                </h3>
+                <div id="alerts-content" class="text-sm text-red-200">
+                    <!-- Alerts populated by JS -->
+                </div>
+            </div>
+            
+            <!-- Live Chat Routing Toggle -->
+            <div class="glass-card p-6">
+                <h3 class="text-lg font-semibold mb-3">Live Chat Override</h3>
+                <label class="flex items-center cursor-pointer">
+                    <div class="relative">
+                        <input type="checkbox" id="live-agent-toggle" class="sr-only">
+                        <div class="block bg-slate-700 w-14 h-8 rounded-full"></div>
+                        <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
+                    </div>
+                    <div class="ml-3 text-slate-300 font-medium">
+                        Take over KOBİ-AI
+                    </div>
+                </label>
+                <p class="text-xs text-slate-400 mt-2">When enabled, AI will pause and you can chat directly with users.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Warehouse & Logistics Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+        <!-- Recent Orders -->
+        <div class="glass-card p-6">
+            <h3 class="text-xl font-semibold mb-4">Recent Orders</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-700 text-slate-400">
+                            <th class="py-3 px-4">Order ID</th>
+                            <th class="py-3 px-4">Customer</th>
+                            <th class="py-3 px-4">Date</th>
+                            <th class="py-3 px-4">Status</th>
+                            <th class="py-3 px-4">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in recent_orders %}
+                        <tr class="border-b border-slate-700 hover:bg-slate-800/50 transition">
+                            <td class="py-3 px-4 font-medium text-white">#{{ order.id }}</td>
+                            <td class="py-3 px-4">{{ order.user.username|default:"Guest" }}</td>
+                            <td class="py-3 px-4">{{ order.order_date|date:"M d, Y" }}</td>
+                            <td class="py-3 px-4">
+                                <span class="px-2 py-1 rounded-full text-xs font-medium 
+                                    {% if order.status == 'delivered' %}bg-emerald-500/20 text-emerald-400
+                                    {% elif order.status == 'shipped' %}bg-blue-500/20 text-blue-400
+                                    {% elif order.status == 'processing' %}bg-amber-500/20 text-amber-400
+                                    {% else %}bg-slate-500/20 text-slate-400{% endif %}">
+                                    {{ order.get_status_display }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-4">
+                                <form action="{% url 'store:update_order_status' order.id %}" method="POST" class="flex gap-2">
+                                    {% csrf_token %}
+                                    <select name="status" class="bg-slate-900 border border-slate-700 text-slate-300 rounded px-2 py-1 text-xs">
+                                        <option value="pending" {% if order.status == 'pending' %}selected{% endif %}>Pending</option>
+                                        <option value="processing" {% if order.status == 'processing' %}selected{% endif %}>Processing</option>
+                                        <option value="shipped" {% if order.status == 'shipped' %}selected{% endif %}>Shipped</option>
+                                        <option value="delivered" {% if order.status == 'delivered' %}selected{% endif %}>Delivered</option>
+                                    </select>
+                                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded text-xs">Update</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="py-4 text-center text-slate-400">No orders yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Warehouse View (Pending Today) -->
+        <div class="glass-card p-6">
+            <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
+                <i data-lucide="package" class="text-amber-400"></i> Warehouse Tasks (Today)
+            </h3>
+            <div class="space-y-4">
+                {% for order in pending_orders %}
+                <div class="flex justify-between items-center p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                    <div>
+                        <p class="font-medium text-white">Order #{{ order.id }} - {{ order.user.username|default:"Guest" }}</p>
+                        <p class="text-xs text-slate-400 mt-1">
+                            Items: {% for item in order.items.all %}{{ item.quantity }}x {{ item.product_variant.product.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                        </p>
+                    </div>
+                    <form action="{% url 'store:update_order_status' order.id %}" method="POST">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="shipped">
+                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all shadow-lg shadow-emerald-900/20">
+                            Pack Item
+                        </button>
+                    </form>
+                </div>
+                {% empty %}
+                <p class="text-slate-400 text-center py-4">No pending orders for today.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Initialize Icons
+    lucide.createIcons();
+
+    // Toggle switch logic
+    const toggle = document.getElementById('live-agent-toggle');
+    const dot = document.querySelector('.dot');
+    toggle.addEventListener('change', function() {
+        if(this.checked) {
+            dot.style.transform = 'translateX(100%)';
+            dot.classList.add('bg-emerald-400');
+        } else {
+            dot.style.transform = 'translateX(0)';
+            dot.classList.remove('bg-emerald-400');
+        }
+    });
+
+    // Initialize Chart
+    var options = {
+        series: [{ name: 'Revenue', data: [] }],
+        chart: {
+            height: 300,
+            type: 'area',
+            toolbar: { show: false },
+            fontFamily: 'Inter, sans-serif',
+            background: 'transparent'
+        },
+        theme: { mode: 'dark' },
+        colors: ['#6366f1'],
+        fill: {
+            type: 'gradient',
+            gradient: {
+                shadeIntensity: 1,
+                opacityFrom: 0.7,
+                opacityTo: 0.1,
+                stops: [0, 90, 100]
+            }
+        },
+        dataLabels: { enabled: false },
+        stroke: { curve: 'smooth', width: 2 },
+        xaxis: {
+            categories: [],
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+            labels: { style: { colors: '#94a3b8' } }
+        },
+        yaxis: { labels: { style: { colors: '#94a3b8' } } },
+        grid: {
+            borderColor: 'rgba(255,255,255,0.05)',
+            strokeDashArray: 4,
+        }
+    };
+    var chart = new ApexCharts(document.querySelector("#revenue-chart"), options);
+    chart.render();
+
+    // Fetch Analytics from FastAPI
+    async function fetchAnalytics() {
+        try {
+            // Stats
+            const statsRes = await fetch('http://127.0.0.1:8001/api/v1/analytics/dashboard-stats');
+            const stats = await statsRes.json();
+            
+            document.getElementById('monthly-revenue').innerText = '$' + stats.total_revenue.toLocaleString();
+            document.getElementById('profit-loss').innerText = stats.pending_orders + ' Pending';
+            
+            let summary = `<p><strong>Growth Rate:</strong> +${stats.growth_rate}%</p>
+                           <p class="mt-2 text-xs">Top Categories:</p><ul class="list-disc pl-4 text-xs mt-1">`;
+            stats.top_categories.forEach(c => {
+                summary += `<li>${c.name} (${c.sales} sales)</li>`;
+            });
+            summary += '</ul>';
+            document.getElementById('ai-summary').innerHTML = summary;
+            
+            // Check for shipping anomalies
+            if(stats.pending_orders > 0) {
+                // We'll simulate anomalies check here for the UI effect
+                const alertsDiv = document.getElementById('smart-alerts');
+                alertsDiv.classList.remove('hidden');
+                document.getElementById('alerts-content').innerHTML = `
+                    <p><strong>Warning:</strong> Detected delayed shipments. Use KOBİ-AI 'check_shipping_anomalies' to draft customer notifications.</p>
+                `;
+                alertsDiv.classList.add('animate-pulse');
+            }
+
+            // Charts
+            const chartsRes = await fetch('http://127.0.0.1:8001/api/v1/analytics/sales-charts');
+            const chartData = await chartsRes.json();
+            
+            chart.updateOptions({
+                xaxis: { categories: chartData.dates }
+            });
+            chart.updateSeries([{
+                name: 'Revenue',
+                data: chartData.revenues
+            }]);
+            
+        } catch (error) {
+            console.error('Failed to fetch analytics', error);
+            document.getElementById('ai-summary').innerText = 'Failed to load AI summary. Is FastAPI running?';
+        }
+    }
+
+    // Load Data
+    fetchAnalytics();
+
+    // AI Campaign Generator
+    document.getElementById('campaign-btn').addEventListener('click', function() {
+        this.innerHTML = '<i data-lucide="loader" class="animate-spin"></i> Generating...';
+        lucide.createIcons();
+        setTimeout(() => {
+            alert('AI Suggestion: Run a "Weekend Flash Sale" offering 15% off low-velocity stock to boost conversions.');
+            this.innerHTML = '<i data-lucide="sparkles"></i> AI Campaign Generator';
+            lucide.createIcons();
+        }, 1500);
+    });
+</script>
+{% endblock %}

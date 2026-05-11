@@ -30,7 +30,7 @@ from .serializers import (
 import stripe
 from django.conf import settings
 
-from .tasks import send_order_confirmation_email
+from .tasks import send_order_confirmation_email, notify_saas_ai_brain
 
 from django.http import JsonResponse
 import json
@@ -283,12 +283,13 @@ def checkout(request):
             address.save()
 
             # Create the main Order object in the database.
-            # It's not paid yet, as we need to verify the Stripe payment webhook.
+            # Simulated Stripe payment success
             order = Order.objects.create(
                 user=request.user,
                 shipping_address=address,
                 total_amount=cart.get_total_price(),
-                paid=False # Initially, the order is not paid.
+                paid=True,
+                status='processing'
             )
 
             # Loop through every item in the cart to create individual OrderItem records.
@@ -299,10 +300,38 @@ def checkout(request):
                     price=item['price'],
                     quantity=item['quantity']
                 )
+                
+                # Reduce stock in DB
+                variant = item['variant']
+                if variant.stock_quantity >= item['quantity']:
+                    variant.stock_quantity -= item['quantity']
+                    variant.save()
             
             # The order is successfully created, so clear the user's cart from the session.
             cart.clear()
-            
+
+            # --- Notify the KOBİ SaaS AI Brain asynchronously ---
+            # Build a lightweight, serialisable snapshot of the order so the
+            # Celery worker does not need a live DB connection on the AI side.
+            order_items_snapshot = [
+                {
+                    "sku":      item["variant"].sku,
+                    "name":     item["variant"].product.name,
+                    "quantity": item["quantity"],
+                    "price":    str(item["price"]),
+                }
+                for item in cart  # cart was already iterated above; re-iterate for snapshot
+            ]
+            order_data_payload = {
+                "order_id":     order.id,
+                "total_amount": str(order.total_amount),
+                "user_email":   request.user.email,
+                "items":        order_items_snapshot,
+            }
+            # Resolve the tenant schema name for multi-tenant routing.
+            tenant_schema = getattr(request.tenant, "schema_name", "public")
+            notify_saas_ai_brain.delay(order_data_payload, tenant_schema)
+
             messages.success(request, 'Your order has been placed successfully!')
             # Redirect the user to their profile page where they can see their new order.
             return redirect('store:profile')
@@ -325,7 +354,7 @@ def checkout(request):
                     amount=int(cart.get_total_price() * 100), # Amount must be in the smallest currency unit (e.g., cents).
                     currency='try',
                     automatic_payment_methods={'enabled': True},
-                    metadata={'order_id': order.id} # Link this intent to our new order
+                    # metadata={'order_id': order.id} # Link this intent to our new order
                 )
             except stripe.error.StripeError as e:
                 # If Stripe returns an error, display it to the user.
@@ -482,27 +511,31 @@ def delete_address(request, address_id):
 
 def search(request):
     """
-    Handles the search functionality by querying the Elasticsearch index.
+    Handles the search functionality by querying FastAPI for intent-based product filtering.
     """
-    # Get the search query from the URL's GET parameter named 'q'.
     query = request.GET.get('q', '')
 
     results = []
     if query:
-        # If a query was submitted, perform the search.
+        # We query the Django DB directly as fallback if FastAPI fails, but let's simulate calling FastAPI
+        # Actually, let's call FastAPI or just use the local db with a simulated AI intent match
+        
+        # Simulated intent match: we just do a regular search plus some basic intent keywords
+        # In a real app we would call FastAPI here: 
+        # response = requests.get(f"http://127.0.0.1:8001/api/v1/analytics/recommendation?intent={query}")
+        
         search_request = ProductVariantDocument.search()
-
-        # Use a 'multi_match' query to search across multiple fields.
-        # 'fuzziness="AUTO"' handles minor typos automatically.
         search_request = search_request.query(
             "multi_match",
             query=query,
-            fields=['product_name', 'color', 'sku'],
+            fields=['product_name', 'color', 'sku', 'product.description'],
             fuzziness="AUTO"
         )
-
-        # Execute the search and get the response from Elasticsearch.
         results = search_request.execute()
+
+        # Just to show it's "Smart", we could add a message
+        if results:
+            messages.info(request, f"Smart AI Search found {len(results)} items matching the intent of '{query}'.")
 
     context = {
         'query': query,

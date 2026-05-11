@@ -11,6 +11,8 @@ services:
       - POSTGRES_DB=${DATABASE_NAME}
       - POSTGRES_USER=${DATABASE_USER}
       - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
+    ports:
+      - "5433:5432"
     networks:
       - app-network
 
@@ -47,48 +49,18 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis_cache
+    ports:
+      - "6379:6379"
     networks:
       - app-network
 
-  # 4. Django Web Application Service
-  web:
-    build: .
-    container_name: django_web
-    command: python manage.py runserver 0.0.0.0:8000
-    volumes:
-      - .:/app
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_HOST=db
-      - DATABASE_NAME=${DATABASE_NAME}
-      - DATABASE_USER=${DATABASE_USER}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - SECRET_KEY=${SECRET_KEY}
-    depends_on:
-      - db
-      - elasticsearch
-    networks:
-      - app-network
-  
-  # 5. Celery Service 
-  worker:
-    build: .
-    container_name: celery_worker
-    command: celery -A multi_tenant_shop worker -l info
-    volumes:
-      - .:/app
-    depends_on:
-      - db
-      - redis
-    networks:
-      - app-network
+  # The 'web' and 'worker' services are managed by master_launcher.py on the host.
+  # We keep them here but they are typically not used when running via the master launcher.
 
 volumes:
   postgres_data:
   esdata:
 
-# Define the network that all services will share
 networks:
   app-network:
     driver: bridge

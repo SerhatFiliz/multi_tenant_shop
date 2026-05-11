@@ -133,7 +133,7 @@ DATABASES = {
         'USER': os.getenv('DATABASE_USER'),
         'PASSWORD': os.getenv('DATABASE_PASSWORD'),
         'HOST': os.getenv('DATABASE_HOST'),
-        'PORT': os.getenv('DATABASE_PORT'),
+        'PORT': os.getenv('DATABASE_PORT', '5432'),
     }
 }
 
@@ -143,8 +143,7 @@ DATABASES = {
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        # Connects to the 'redis' service defined in docker-compose.yml.
-        "LOCATION": "redis://redis:6379/1",
+        "LOCATION": "redis://127.0.0.1:6379/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }
@@ -253,13 +252,15 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # --- CELERY CONFIGURATION ---
 # Uses Redis as the message broker.
-CELERY_BROKER_URL = 'redis://redis:6379/0'
-CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
+CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
+CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 
 # --- MEDIA FILES CONFIGURATION (for user-uploaded content) ---
 # The absolute filesystem path to the directory that will hold user-uploaded files.
+LOGIN_REDIRECT_URL = '/nexus/dashboard/'
+LOGIN_URL = '/login/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

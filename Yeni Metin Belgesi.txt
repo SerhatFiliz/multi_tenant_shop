@@ -1,0 +1,83 @@
+Multitenant süper user    user_test
+Username SerhatFiliz
+Email address sserhat.ffiliz@gmail.com
+Password 22ser52hat2002
+
+root@acffd5026635:/app# python manage.py create_tenant --schema=public
+name: Multi Tenant Shop Public
+is approved: True
+domain: multitenantshop.com
+is primary (leave blank to use 'True'): 
+
+superuser:
+Username Serhat
+Email address sserhat.ffiliz@gmail.com
+Password 22ser52hat2002
+
+
+
+
+
+multi_tenant_shop/store/models.py dosyasındaki ProductVariant modeline, kar hesaplamaları için cost_price (alış fiyatı) alanını ekle.
+
+Ürünlere puan ve yorum yapma işlevi için yeni bir Review modeli oluştur. Bu model User, Product, rating (puan) ve comment (yorum) alanlarını içerecek.
+
+Mevcut kod tabanını tamamen İngilizce'ye çevir. Bu, tüm değişken, fonksiyon, sınıf adlarını ve yorum satırlarını kapsayacak.
+
+Model değişikliklerini veritabanına yansıtmak için makemigrations ve migrate komutlarını çalıştır.
+
+
+Çoklu Dil (i18n) Entegrasyonu:
+
+settings.py dosyasını çoklu dil desteği için yapılandır.
+
+Tüm .html şablonlarındaki kullanıcıya görünen metinleri {% trans "..." %} etiketi ile çevrilebilir hale getir.
+
+Otomatik dil algılama ve manuel dil seçimi için gerekli arayüz elemanlarını base.html şablonuna ekle.
+
+
+
+Adım 4: Mağaza Yönetim Dashboardu ve Veri Görselleştirme
+
+Bu adımda mağaza sahipleri için özel bir yönetim paneli oluşturacağız.
+
+
+
+store_management uygulamasında urls.py dosyasını oluşturarak dashboard, sipariş listesi ve stok yönetimi gibi sayfalara erişim URL'lerini tanımla.
+
+views.py içinde, günlük, haftalık, aylık ve yıllık ciro, kar gibi metrikleri hesaplayacak bir DashboardView oluştur.
+
+store_management/templates/ altında yeni bir HTML şablonu oluşturarak bu verileri Chart.js ile dinamik grafikler halinde görselleştir.
+
+Adım 5: Kapsamlı Stok, Ürün ve Yorum Yönetimi
+
+Bu adımda, mağaza sahibinin ürünlerini detaylı olarak yönetmesini sağlayacağız.
+
+
+
+Ürün ve stok ekleme, düzenleme ve silme işlemlerini yönetecek formlar ve görünümler oluştur.
+
+Yorum ve Puan Yönetimi: Yöneticilerin ürünlere gelen yorumları ve puanları görebileceği, yönetebileceği bir arayüz geliştir.
+
+Her sipariş sonrası stoğu otomatik olarak azaltan bir mantık geliştir. Düşük stok durumunda yöneticiye uyarı verecek bir sistem kur.
+
+Adım 6: Gerçek Zamanlı Bildirimler için WebSocket
+
+Bu adım, projenize anlık bildirim yeteneği kazandıracak.
+
+
+
+Django Channels'ı kur ve gerekli ayarları yap.
+
+Yeni siparişler, müşteri mesajları veya düşük stok uyarıları gibi önemli olaylar olduğunda mağaza sahibine anlık bildirimler gönderecek bir WebSocket Consumer yaz.
+
+Adım 7: Kiracı (Tenant) Kayıt Arayüzü
+
+Son olarak, yeni mağazaların site üzerinden kolayca kayıt olabilmesini sağlayacağız.
+
+
+
+Yeni bir mağaza kaydı için kullanıcı arayüzü ve formları geliştir.
+
+Formu kullanarak otomatik olarak yeni bir kiracı, veritabanı şeması ve domain oluşturacak mantığı entegre et.
+

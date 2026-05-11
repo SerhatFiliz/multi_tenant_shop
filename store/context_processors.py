@@ -1,15 +1,18 @@
 # store/context_processors.py
+import os
 from .cart import Cart
 
 def tenant_context(request):
     """
-    This context processor makes the current tenant object available
-    in every template across the entire project.
-    The django-tenants middleware already adds the 'tenant' object
-    to the incoming 'request' object. We are just extracting it here.
+    Makes the current tenant, cart, and AI service port available in every
+    template. The AI port is read from the AI_PORT environment variable
+    which is dynamically set by master_launcher.py at boot time.
     """
     return {
         'current_tenant': request.tenant,
-        'cart': Cart(request)
+        'cart': Cart(request),
+        # The FastAPI SaaS Brain port, injected by master_launcher.py.
+        # Used by base.html to construct the KOBI-AI widget src URL.
+        'ai_port': os.getenv('AI_PORT', '8001'),
     }
 

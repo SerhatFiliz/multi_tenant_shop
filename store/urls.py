@@ -1,6 +1,6 @@
 #store/urls.py
 from django.urls import path
-from . import views
+from . import views, admin_views
 from django.contrib.auth import views as auth_views
 
 app_name = 'store'
@@ -35,7 +35,16 @@ urlpatterns = [
     # --- Search URL ---
     path('search/', views.search, name='search'),
 
+    # --- Nexus-Admin Dashboard ---
+    path('nexus/dashboard/', admin_views.nexus_dashboard, name='nexus_dashboard'),
+    path('nexus/update-order/<int:order_id>/', admin_views.update_order_status, name='update_order_status'),
+
     # --- API Endpoints (For AJAX/JavaScript) ---
     path('api/cart/update/', views.cart_update_api, name='cart_update_api'),
     path('api/cart/remove/', views.cart_remove_api, name='cart_remove_api'),
 ]
+
+from rest_framework.routers import DefaultRouter
+router = DefaultRouter()
+router.register(r'api/products', views.ProductViewSet, basename='product')
+urlpatterns += router.urls
