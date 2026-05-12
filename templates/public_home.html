@@ -137,6 +137,48 @@
 </section>
 
 <!-- ================================================================
+     GLOBAL MARKETPLACE PRODUCTS
+================================================================ -->
+<section style="margin:4rem 0;">
+    <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.75rem;font-weight:800;text-align:center;margin-bottom:0.75rem;">
+        Discover <span class="gradient-text">Top Products</span> Across Stores
+    </h2>
+    <p style="color:var(--text-secondary);text-align:center;margin-bottom:2.5rem;font-size:0.9375rem;">Explore a curated selection from all our verified sellers.</p>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:20px;">
+        {% for variant in global_products %}
+        <div class="nexus-card" style="display:flex;flex-direction:column;border-radius:12px;overflow:hidden;">
+            <a href="http://{{ variant.tenant_domain }}:8000/product/{{ variant.product.slug }}/?sku={{ variant.sku }}" style="display:block;text-decoration:none;color:inherit;position:relative;">
+                {% if variant.image %}
+                    <img src="http://{{ variant.tenant_domain }}:8000{{ variant.image.url }}" alt="{{ variant.product.name }}" style="width:100%;height:200px;object-fit:cover;">
+                {% else %}
+                    <div style="width:100%;height:200px;background:var(--surface-glass);display:flex;align-items:center;justify-content:center;">
+                        <i data-lucide="image" width="32" height="32" style="color:var(--text-muted);"></i>
+                    </div>
+                {% endif %}
+                <div style="padding:1rem;">
+                    <div style="font-size:0.75rem;color:var(--brand-primary);font-weight:600;margin-bottom:4px;text-transform:uppercase;">
+                        {{ variant.tenant_name }}
+                    </div>
+                    <h3 style="font-size:1rem;font-weight:600;margin-bottom:8px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        {{ variant.product.name }}
+                    </h3>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="font-weight:700;color:var(--text-primary);">${{ variant.sale_price }}</span>
+                        <span style="font-size:0.8125rem;color:var(--text-secondary);background:var(--surface-glass);padding:4px 8px;border-radius:6px;">View</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+        {% empty %}
+        <div style="grid-column:1/-1;text-align:center;color:var(--text-secondary);padding:3rem;">
+            No products available yet. Come back soon!
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- ================================================================
      CALL-TO-ACTION BANNER
 ================================================================ -->
 <section style="margin:4rem 0;">

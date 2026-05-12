@@ -58,6 +58,28 @@ class HomePageView(TemplateView):
     """
     template_name = "home.html"
 
+from django_tenants.utils import schema_context
+from store.models import Tenant, ProductVariant
+
+class MarketplaceHomeView(TemplateView):
+    template_name = "public_home.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        all_products = []
+        for tenant in Tenant.objects.exclude(schema_name='public'):
+            with schema_context(tenant.schema_name):
+                # Fetch top 8 active variants per tenant
+                variants = list(ProductVariant.objects.filter(is_active=True).select_related('product')[:8])
+                for v in variants:
+                    v.tenant_domain = tenant.domains.first().domain if tenant.domains.exists() else None
+                    v.tenant_name = tenant.name
+                    all_products.append(v)
+        # Sort or shuffle if needed, for now just slice top 24
+        context['global_products'] = all_products[:24]
+        return context
+
+
 class ProductListView(ListView):
     """
     A view to display a list of all active product variants.

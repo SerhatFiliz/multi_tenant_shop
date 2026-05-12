@@ -221,13 +221,15 @@
     // Toggle switch logic
     const toggle = document.getElementById('live-agent-toggle');
     const dot = document.querySelector('.dot');
-    toggle.addEventListener('change', function() {
+    toggle.addEventListener('change', async function() {
         if(this.checked) {
             dot.style.transform = 'translateX(100%)';
             dot.classList.add('bg-emerald-400');
+            await fetch(`http://127.0.0.1:8001/api/v1/chat/override?override=true`, {method: 'POST'});
         } else {
             dot.style.transform = 'translateX(0)';
             dot.classList.remove('bg-emerald-400');
+            await fetch(`http://127.0.0.1:8001/api/v1/chat/override?override=false`, {method: 'POST'});
         }
     });
 

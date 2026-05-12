@@ -1,74 +1,35 @@
-# Multi-Tenant E-Commerce Platform
+# NexusCommerce Core (Marketplace & Tenant Engine) 🏢
 
-This is a comprehensive multi-tenant e-commerce platform built with Python and Django, designed to host multiple independent stores on a single codebase. The project leverages a modern, containerized architecture with advanced features like a real-time search engine and asynchronous task processing.
-
----
-
-## Core Features
-
-- **Multi-Tenancy Architecture:** Uses `django-tenants` to provide complete data isolation for each store via PostgreSQL schemas.
-- **Full E-Commerce Flow:** Complete user journey from product viewing, cart management, to a real payment process using Stripe.
-- **Elasticsearch Integration:** A powerful, typo-tolerant, and fast search engine for the product catalog.
-- **Asynchronous Tasks:** Uses Celery and Redis to handle time-consuming tasks like sending order confirmation emails in the background.
-- **REST API:** A secure, read-write API built with Django REST Framework for programmatic access to the product catalog.
-- **Dockerized Environment:** The entire application stack (Django, PostgreSQL, Elasticsearch, Redis, Celery) is containerized with Docker and Docker Compose for a consistent and portable development environment.
-- **Continuous Integration (CI):** An automated testing pipeline using GitHub Actions to ensure code quality and reliability.
+The **NexusCommerce Core** is the robust, high-traffic "Body" of our B2B SaaS ecosystem. Built with Django, it provides an enterprise-ready Multi-Tenant Architecture that enables thousands of SMEs to operate isolated, custom storefronts while simultaneously feeding a global marketplace aggregator.
 
 ---
 
-## Technology Stack
+## 🛠️ Tech Stack
 
-- **Backend:** Python, Django, Django REST Framework
-- **Database:** PostgreSQL
-- **Multi-Tenancy:** django-tenants
-- **Search Engine:** Elasticsearch
-- **Task Queue:** Celery, Redis
-- **Payment Gateway:** Stripe
-- **Containerization:** Docker, Docker Compose
-- **CI/CD:** GitHub Actions
+- **Framework**: Django 5.x
+- **Database**: PostgreSQL (Leveraging Postgres schemas for isolation)
+- **Multi-Tenancy**: `django-tenants`
+- **Asynchronous Tasks**: Celery (Simulated) & Redis
+- **Styling**: Tailwind CSS & Glassmorphism UI
+- **Search**: Elasticsearch Integration
 
 ---
 
-## Local Setup & Installation
+## ✨ Key Features
 
-1.  **Prerequisites:**
-    - Docker
-    - Docker Compose
+### 1. 'Trendyol-Style' Global Marketplace Aggregator
+The public schema (`public_home.html`) serves as a unified mega-marketplace. It queries active inventory across all SME schemas in real-time, allowing customers to discover products globally while routing them to the specific tenant's domain for checkout.
 
-2.  **Clone the repository:**
-    ```bash
-    git clone [https://github.com/SerhatFiliz/multi_tenant_shop.git](https://github.com/SerhatFiliz/multi_tenant_shop.git)
-    cd multi_tenant_shop
-    ```
+### 2. Isolated Multi-Tenant Database Schemas
+Data privacy and integrity are paramount for SMEs. Using `django-tenants`, every store gets its own dedicated PostgreSQL schema. This ensures zero data leakage between competitors and allows for massive horizontal scaling.
 
-3.  **Environment Variables:**
-    - Rename the `.env.example` file to `.env`.
-    - Fill in the required values (especially `SECRET_KEY` and your Stripe API keys).
+### 3. Live Chat Override (Human Handoff)
+While our AI Brain handles customer support by default, store owners need control. The Nexus-Admin dashboard features a seamless **Live Chat Override** toggle. When activated, the AI immediately steps back, routing WebSockets directly to the human store owner for VIP customer service.
 
-4.  **Build and Run the Containers:**
-    ```bash
-    docker-compose build
-    docker-compose up
-    ```
+### 4. Webhook Triggers for AI Synchronization
+To keep the decoupled AI Brain perfectly in sync, the Django core fires background HTTP Webhooks (`/api/v1/webhooks/store-event`) upon critical state changes—such as order placements or stock depletions. This ensures the AI always has the latest context without burdening the primary transactional database.
 
-5.  **Initial Database Setup (Run in a separate terminal):**
-    - Apply shared migrations:
-      ```bash
-      docker-compose exec web python manage.py migrate_schemas --shared
-      ```
-    - Create a superuser:
-      ```bash
-      docker-compose exec web python manage.py createsuperuser
-      ```
-    - Create the first tenant (run inside the shell):
-      ```bash
-      docker-compose exec web python manage.py shell
-      # ... (paste the tenant creation script here) ...
-      ```
+---
 
-6.  **Accessing the Application:**
-    - **Main Store:** `http://inciboncuk.localhost:8000/` (You may need to edit your local `hosts` file).
-    - **Admin Panel:** `http://localhost:8000/admin/`
-    - **API:** `http://inciboncuk.localhost:8000/api/products/`
-    - **Kibana:** `http://localhost:5601/`
-
+## 🔗 Architecture Link
+This repository handles the **transactional e-commerce layer**. For details on the intelligence and analytics layer, please see the [Nexus AI Brain (FastAPI) Repository](../saas_ecommerce_ai_agent/README.md).

@@ -290,3 +290,12 @@ class Wishlist(models.Model):
 
     def __str__(self):
         return f"{self.user.username}'s Wishlist"
+
+class StoreSettings(models.Model):
+    """
+    Settings specific to a tenant store.
+    """
+    live_chat_override = models.BooleanField(default=False, help_text="Bypass AI agent and route to live human agent")
+
+    def __str__(self):
+        return f"Store Settings (Live Chat Override: {self.live_chat_override})"

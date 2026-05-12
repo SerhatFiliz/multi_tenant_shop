@@ -45,7 +45,7 @@ def send_order_confirmation_email(order_id):
 # ---------------------------------------------------------------------------
 
 # Target URL of the SaaS AI Brain webhook endpoint.
-_SAAS_BRAIN_URL = "http://localhost:8001/api/v1/events/ingest"
+_SAAS_BRAIN_URL = "http://localhost:8001/api/v1/webhooks/store-event"
 # API key must match SAAS_API_KEY in the FastAPI service's environment.
 _SAAS_API_KEY   = "demo-tenant-key-123"
 
