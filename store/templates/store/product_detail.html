@@ -3,107 +3,179 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="row">
-        <div class="col-md-6">
-            <img src="{% if initial_variant.image %}{{ initial_variant.image.url }}{% else %}https://placehold.co/600x450/EFEFEF/AAAAAA?text=Resim+Yok{% endif %}" 
-                 class="img-fluid rounded border" 
-                 id="main-image" 
+<style>
+    .product-shell { display: grid; gap: 1.5rem; }
+    .product-hero { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(360px, .92fr); gap: 1.25rem; align-items: stretch; }
+    .media-panel, .buy-panel, .owner-panel, .review-panel, .review-form-panel { background: rgba(15, 17, 27, .72); border: 1px solid rgba(148, 163, 184, .16); border-radius: 8px; backdrop-filter: blur(18px); box-shadow: 0 24px 80px rgba(0,0,0,.35); }
+    .media-panel { min-height: 620px; display: grid; place-items: center; overflow: hidden; position: relative; }
+    .media-panel:before { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(37,99,235,.18), rgba(124,58,237,.12), rgba(6,182,212,.12)); }
+    .product-image { position: relative; z-index: 1; width: min(88%, 760px); max-height: 540px; object-fit: contain; filter: drop-shadow(0 30px 50px rgba(0,0,0,.42)); }
+    .buy-panel { padding: clamp(1.25rem, 4vw, 2rem); display: flex; flex-direction: column; justify-content: center; }
+    .product-kicker { color: #67e8f9; font-size: .76rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; margin-bottom: .8rem; }
+    .product-title { font-family: 'Plus Jakarta Sans', sans-serif; font-size: clamp(2.1rem, 5vw, 4rem); line-height: 1.02; font-weight: 900; color: #f8fafc; margin-bottom: 1rem; }
+    .product-description { color: #cbd5e1; font-size: 1.02rem; line-height: 1.8; }
+    .price-row { display: flex; align-items: end; justify-content: space-between; gap: 1rem; padding: 1.1rem 0; margin: 1rem 0; border-top: 1px solid rgba(148,163,184,.14); border-bottom: 1px solid rgba(148,163,184,.14); }
+    .price { font-size: clamp(2rem, 4vw, 3rem); font-weight: 900; color: #f8fafc; }
+    .fx { color: #94a3b8; font-size: .9rem; }
+    .meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; margin-bottom: 1rem; }
+    .meta-tile { border: 1px solid rgba(148,163,184,.14); background: rgba(2,6,23,.42); border-radius: 8px; padding: .85rem; }
+    .meta-tile span { display: block; color: #64748b; font-size: .72rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+    .meta-tile strong { display: block; color: #f8fafc; margin-top: .2rem; }
+    .variant-grid { display: flex; flex-wrap: wrap; gap: .6rem; margin: .7rem 0 1rem; }
+    .variant-pill { border: 1px solid rgba(148,163,184,.2); background: rgba(15,23,42,.75); color: #e5e7eb; border-radius: 999px; padding: .58rem .85rem; cursor: pointer; }
+    .variant-pill input { display: none; }
+    .variant-pill:has(input:checked) { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(99,102,241,.18); color: #fff; }
+    .gradient-btn { width: 100%; border: 0; border-radius: 8px; color: #fff; font-weight: 900; padding: .95rem 1rem; background: linear-gradient(135deg, #2563eb 0%, #7c3aed 52%, #06b6d4 100%); box-shadow: 0 16px 36px rgba(99,102,241,.35); }
+    .ghost-btn { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; border-radius: 8px; border: 1px solid rgba(148,163,184,.18); color: #e5e7eb; text-decoration: none; background: rgba(15,23,42,.58); padding: .8rem 1rem; font-weight: 800; }
+    .owner-panel { padding: 1.25rem; }
+    .owner-panel h2, .reviews-title { font-size: 1.15rem; font-weight: 900; margin-bottom: 1rem; }
+    .reviews-header { display: flex; align-items: end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
+    .reviews-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: .9rem; margin-top: 1rem; }
+    .review-panel { padding: 1rem; }
+    .review-top { display: flex; gap: .75rem; align-items: center; margin-bottom: .8rem; }
+    .avatar { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #2563eb, #7c3aed); color: #fff; font-weight: 900; }
+    .stars { color: #fbbf24; letter-spacing: .05em; font-size: .92rem; }
+    .review-panel p { color: #cbd5e1; margin-bottom: .7rem; }
+    .review-form-panel { padding: 1.25rem; margin-top: 1rem; }
+    .review-form-panel label { color: #cbd5e1; font-weight: 700; }
+    .review-form-panel .form-control, .review-form-panel .form-select, .modal textarea { background: rgba(15,23,42,.92) !important; border: 1px solid rgba(148,163,184,.22) !important; color: #f8fafc !important; border-radius: 8px !important; }
+    @media (max-width: 980px) { .product-hero { grid-template-columns: 1fr; } .media-panel { min-height: 420px; } .meta-grid { grid-template-columns: 1fr; } }
+</style>
+
+<div class="product-shell">
+    <section class="product-hero">
+        <div class="media-panel">
+            <img src="{% if initial_variant.image %}{{ initial_variant.image.url }}{% else %}https://placehold.co/900x700/111827/94a3b8?text={{ product.name|urlencode }}{% endif %}"
+                 class="product-image"
+                 id="main-image"
                  alt="{{ product.name }}">
         </div>
-        
-        <div class="col-md-6">
-            <h1>{{ product.name }}</h1>
-            <p class="text-muted">{{ product.category.name }}</p>
-            <p>{{ product.description }}</p>
-            <hr>
+
+        <aside class="buy-panel">
+            <a class="product-kicker" href="{% url 'store:store_profile' store_slug %}" style="text-decoration:none;display:inline-flex;gap:.45rem;align-items:center;">
+                <i data-lucide="store" width="15"></i> {{ store_name }}
+            </a>
+            <div style="color:#94a3b8;font-size:.86rem;margin-bottom:.5rem;">{{ product.category.name }}</div>
+            <h1 class="product-title">{{ product.name }}</h1>
+            <p class="product-description">{{ product.description }}</p>
 
             {% if initial_variant %}
-                
-                <h3 id="variant-price" class="mb-3">{{ initial_variant.sale_price|stringformat:".2f" }} TL</h3>
-                <p class="mb-1"><strong>SKU:</strong> <span id="variant-sku">{{ initial_variant.sku }}</span></p>
-                <p><strong>Stok Durumu:</strong> <span id="variant-stock">{{ initial_variant.stock_quantity }}</span> adet</p>
-
-                <form action="{% url 'store:cart_add' variant_id=initial_variant.id %}" method="post" id="add-to-cart-form">
-                    {% csrf_token %}
-                    <div class="my-4">
-                        <label class="form-label fw-bold">Renk Seçimi:</label>
-                        <div class="d-flex">
-                            {% for variant in variants %}
-                            <div class="form-check me-4">
-                                <input class="form-check-input variant-selector" type="radio" name="variant_option" 
-                                       id="variant-{{ variant.id }}" value="{{ variant.id }}" {% if variant.id == initial_variant.id %}checked{% endif %}>
-                                <label class="form-check-label" for="variant-{{ variant.id }}">
-                                    {{ variant.color }} {{ variant.size }}
-                                </label>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-lg w-100">Sepete Ekle</button>
-                </form>
-
-            {% else %}
-                <div class="alert alert-warning mt-4" role="alert">
-                    Bu ürün geçici olarak stoklarımızda mevcut değildir.
+            <div class="price-row">
+                <div>
+                    <div class="price" id="variant-price">{{ initial_variant.sale_price|stringformat:".2f" }} TL</div>
+                    <div class="fx">Approx. ${{ fx_equivalents.USD|floatformat:2 }} / EUR {{ fx_equivalents.EUR|floatformat:2 }}</div>
                 </div>
-            {% endif %}
-            {% if request.user.is_authenticated %}
-                <a href="{% url 'store:add_to_wishlist' slug=product.slug %}" class="btn btn-outline-secondary mt-3">
-                    <i class="fas fa-heart"></i> İstek Listesine Ekle
-                </a>
+            </div>
+
+            <div class="meta-grid">
+                <div class="meta-tile"><span>SKU</span><strong id="variant-sku">{{ initial_variant.sku }}</strong></div>
+                <div class="meta-tile"><span>Stock</span><strong><span id="variant-stock">{{ initial_variant.stock_quantity }}</span> available</strong></div>
+            </div>
+
+            <form action="{% url 'store:cart_add' variant_id=initial_variant.id %}" method="post" id="add-to-cart-form">
+                {% csrf_token %}
+                <label class="form-label fw-bold" style="color:#cbd5e1;">Configuration</label>
+                <div class="variant-grid">
+                    {% for variant in variants %}
+                    <label class="variant-pill" for="variant-{{ variant.id }}">
+                        <input class="variant-selector" type="radio" name="variant_option" id="variant-{{ variant.id }}" value="{{ variant.id }}" {% if variant.id == initial_variant.id %}checked{% endif %}>
+                        {{ variant.color|default:"Default" }} {{ variant.size|default:"" }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <button type="submit" class="gradient-btn">Sepete Ekle</button>
+            </form>
+            {% else %}
+            <div class="nexus-alert nexus-alert-info mt-4">Bu ürün geçici olarak stoklarımızda mevcut değildir.</div>
             {% endif %}
 
+            {% if request.user.is_authenticated %}
+            <div style="display:flex;gap:.7rem;flex-wrap:wrap;margin-top:.85rem;">
+                <a href="{% url 'store:add_to_wishlist' slug=product.slug %}" class="ghost-btn"><i data-lucide="heart" width="16" height="16"></i>Favorilere Ekle</a>
+                <button type="button" class="ghost-btn" data-bs-toggle="modal" data-bs-target="#product-message-modal"><i data-lucide="message-circle" width="16" height="16"></i>Mağazaya Soru Sor</button>
+            </div>
+            {% endif %}
+        </aside>
+    </section>
+
+    {% if initial_variant and request.user.is_staff %}
+    <section class="owner-panel">
+        <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+            <h2>Owner Price Intelligence</h2>
+            <span style="color:#94a3b8;">Lowest 30 days: {{ lowest_30_day_price|stringformat:".2f" }} TL</span>
+        </div>
+        <canvas id="price-history-chart" height="105"></canvas>
+    </section>
+    {% endif %}
+
+    {% if request.user.is_authenticated %}
+    <div class="modal fade" id="product-message-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="background:#111827;color:#f8fafc;border:1px solid rgba(255,255,255,.12);border-radius:8px;">
+                <form method="post" action="{% url 'store:send_store_message' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.path }}">
+                    <div class="modal-header" style="border-color:rgba(255,255,255,.1);">
+                        <h5 class="modal-title">{{ product.name }} hakkında soru sor</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <textarea name="content" rows="5" required class="form-control">Merhaba, {{ product.name }} hakkında bilgi almak istiyorum.</textarea>
+                    </div>
+                    <div class="modal-footer" style="border-color:rgba(255,255,255,.1);">
+                        <button type="button" class="ghost-btn" data-bs-dismiss="modal">Vazgeç</button>
+                        <button type="submit" class="gradient-btn" style="width:auto;padding:.75rem 1.15rem;">Gönder</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
-    
-    <hr>
-    
-    <div class="reviews-section mt-5">
-        <h3>Müşteri Yorumları</h3>
-        
-        {% if average_rating %}
-            <p><strong>Ortalama Puan:</strong> {{ average_rating|floatformat:1 }}/5</p>
-        {% else %}
-            <p>Henüz yorum yok.</p>
-        {% endif %}
-        
-        <div class="existing-reviews mt-3">
+    {% endif %}
+
+    <section>
+        <div class="reviews-header">
+            <div>
+                <div class="product-kicker">Customer Proof</div>
+                <h2 class="reviews-title">Müşteri Yorumları</h2>
+            </div>
+            <div class="stars">{% if average_rating %}★ {{ average_rating|floatformat:1 }}/5{% else %}No reviews yet{% endif %}</div>
+        </div>
+
+        <div class="reviews-grid">
             {% for review in reviews %}
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <h5 class="card-title">{{ review.user.username }}</h5>
-                        <h6 class="card-subtitle mb-2 text-muted">Puan: {{ review.rating }}/5</h6>
-                        <p class="card-text">{{ review.comment }}</p>
-                        <small class="text-muted">Paylaşım Tarihi: {{ review.created_at|date:"F d, Y" }}</small>
+            <article class="review-panel">
+                <div class="review-top">
+                    <div class="avatar">{{ review.user.username|first|upper }}</div>
+                    <div>
+                        <strong>{{ review.user.username }}</strong>
+                        <div class="stars">{% for i in "12345" %}{% if forloop.counter <= review.rating %}★{% else %}☆{% endif %}{% endfor %}</div>
                     </div>
                 </div>
+                <p>{{ review.comment }}</p>
+                <small style="color:#64748b;">{{ review.created_at|date:"F d, Y" }}</small>
+            </article>
             {% empty %}
-                <p>İlk yorumu yapan sen ol!</p>
+            <div class="review-panel">İlk yorumu yapan sen ol.</div>
             {% endfor %}
         </div>
 
-        <hr>
-
         {% if request.user.is_authenticated %}
-            <div class="review-form mt-4">
-                <h4>Yorum Yap</h4>
-                <form action="{% url 'store:product_detail' slug=product.slug %}" method="post">
-                    {% csrf_token %}
-                    {{ review_form|crispy }}
-                    <button type="submit" class="btn btn-primary">Yorumu Gönder</button>
-                </form>
-            </div>
+        <div class="review-form-panel">
+            <h3 style="font-size:1rem;font-weight:900;">Yorum Yap</h3>
+            <form action="{% url 'store:product_detail' slug=product.slug %}" method="post">
+                {% csrf_token %}
+                {{ review_form|crispy }}
+                <button type="submit" class="gradient-btn" style="max-width:260px;">Yorumu Gönder</button>
+            </form>
+        </div>
         {% else %}
-            <p class="text-info">Yorum yapmak için lütfen <a href="{% url 'store:login' %}">giriş yapın</a>.</p>
+        <p class="mt-4" style="color:#93c5fd;">Yorum yapmak için lütfen <a href="{% url 'store:login' %}" style="color:#bfdbfe;">giriş yapın</a>.</p>
         {% endif %}
-    </div>
-
+    </section>
 </div>
 
 {% if initial_variant %}
 <script>
-    // Script 1: Updates the form's ACTION URL
     document.querySelectorAll('.variant-selector').forEach(selector => {
         selector.addEventListener('change', function() {
             const selectedId = this.value;
@@ -112,49 +184,57 @@
             form.action = baseUrl.replace('/0/', '/' + selectedId + '/');
         });
     });
-</script>
 
-<script>
-    // Script 2: Updates the PRICE, SKU, STOCK, and IMAGE
     document.addEventListener('DOMContentLoaded', function () {
         const variantsDataElement = document.getElementById('variants-data');
         if (!variantsDataElement) { return; }
-        
         const variantsData = JSON.parse(variantsDataElement.textContent);
         const priceElement = document.getElementById('variant-price');
         const skuElement = document.getElementById('variant-sku');
         const stockElement = document.getElementById('variant-stock');
         const imageElement = document.getElementById('main-image');
-        const variantSelectors = document.querySelectorAll('.variant-selector');
 
         function updateVariantInfo(selectedVariantId) {
             const selectedVariant = variantsData.find(variant => variant.id === selectedVariantId);
-
-            if (selectedVariant) {
-                if (priceElement) priceElement.textContent = parseFloat(selectedVariant.sale_price).toFixed(2) + ' TL';
-                if (skuElement) skuElement.textContent = selectedVariant.sku;
-                if (stockElement) stockElement.textContent = selectedVariant.stock_quantity + ' adet';
-                
-                if (imageElement) {
-                    if (selectedVariant.image) {
-                        imageElement.src = '/media/' + selectedVariant.image;
-                    } else {
-                        imageElement.src = 'https://placehold.co/600x450/EFEFEF/AAAAAA?text=Resim+Yok';
-                    }
-                }
-            }
+            if (!selectedVariant) return;
+            if (priceElement) priceElement.textContent = parseFloat(selectedVariant.sale_price).toFixed(2) + ' TL';
+            if (skuElement) skuElement.textContent = selectedVariant.sku;
+            if (stockElement) stockElement.textContent = selectedVariant.stock_quantity;
+            if (imageElement) imageElement.src = selectedVariant.image ? '/media/' + selectedVariant.image : 'https://placehold.co/900x700/111827/94a3b8?text={{ product.name|urlencode }}';
         }
 
-        variantSelectors.forEach(selector => {
-            selector.addEventListener('change', function() {
-                const selectedId = parseInt(this.value);
-                updateVariantInfo(selectedId);
-            });
+        document.querySelectorAll('.variant-selector').forEach(selector => {
+            selector.addEventListener('change', function() { updateVariantInfo(parseInt(this.value)); });
         });
     });
 </script>
 
 {{ variants_data_for_js|json_script:"variants-data" }}
+{% if request.user.is_staff %}
+{{ price_history_data|json_script:"price-history-data" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const node = document.getElementById('price-history-data');
+        const canvas = document.getElementById('price-history-chart');
+        if (!node || !canvas) return;
+        const points = JSON.parse(node.textContent);
+        new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: points.map(p => p.date),
+                datasets: [{ label: 'Price', data: points.map(p => p.price), borderColor: '#818cf8', backgroundColor: 'rgba(99,102,241,.18)', fill: true, tension: 0.35 }]
+            },
+            options: {
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,.08)' } },
+                    y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,.08)' } }
+                }
+            }
+        });
+    });
+</script>
 {% endif %}
-
+{% endif %}
 {% endblock content %}

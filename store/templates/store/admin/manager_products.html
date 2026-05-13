@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;margin-bottom:1.2rem;">
+    <div>
+        <div style="color:#67e8f9;font-size:.78rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;">Nexus Dashboard</div>
+        <h1 style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:900;">Ürünlerim</h1>
+    </div>
+    <a href="{% url 'store:nexus_dashboard' %}" class="btn-nexus-ghost">Dashboard</a>
+</div>
+<div class="nexus-card" style="padding:1rem;">
+    <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr style="color:#94a3b8;text-align:left;border-bottom:1px solid rgba(148,163,184,.14);">
+                    <th style="padding:.8rem;">Ürün</th>
+                    <th style="padding:.8rem;">SKU</th>
+                    <th style="padding:.8rem;">Fiyat</th>
+                    <th style="padding:.8rem;">Stok</th>
+                    <th style="padding:.8rem;">Durum</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for variant in variants %}
+                <tr style="border-bottom:1px solid rgba(148,163,184,.08);">
+                    <td style="padding:.8rem;"><a href="{% url 'store:product_detail_variant' variant.product.slug variant.sku %}" style="color:#f8fafc;text-decoration:none;font-weight:800;">{{ variant.product.name }}</a></td>
+                    <td style="padding:.8rem;color:#94a3b8;">{{ variant.sku }}</td>
+                    <td style="padding:.8rem;">{{ variant.sale_price }} {{ variant.sale_currency }}</td>
+                    <td style="padding:.8rem;">{{ variant.stock_quantity }}</td>
+                    <td style="padding:.8rem;">{% if variant.is_active %}<span style="color:#34d399;">Aktif</span>{% else %}<span style="color:#f87171;">Pasif</span>{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" style="padding:1rem;color:#94a3b8;">Henüz ürün yok.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

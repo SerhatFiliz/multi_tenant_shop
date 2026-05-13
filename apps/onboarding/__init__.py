@@ -1,0 +1,2 @@
+"""Tenant onboarding domain."""
+

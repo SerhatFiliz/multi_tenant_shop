@@ -8,12 +8,25 @@ class TenantCreationForm(forms.ModelForm):
     last_name = forms.CharField(label="Soyisim", max_length=100)
     email = forms.EmailField(label="E-posta", max_length=100)
 
+    password = forms.CharField(widget=forms.PasswordInput, label="Şifre")
+    confirm_password = forms.CharField(widget=forms.PasswordInput, label="Şifre Tekrar")
+
     class Meta:
         model = get_tenant_model()
         fields = ('name',)
         labels = {
             'name': 'Mağaza Adı (Alan adı olarak kullanılacak)',
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password = cleaned_data.get("password")
+        confirm_password = cleaned_data.get("confirm_password")
+
+        if password and confirm_password and password != confirm_password:
+            self.add_error('confirm_password', "Şifreler eşleşmiyor.")
+
+        return cleaned_data
 
     def clean_name(self):
         name = self.cleaned_data['name'].lower()
@@ -38,7 +51,7 @@ class TenantCreationForm(forms.ModelForm):
             user = get_user_model().objects.create_user(
                 username=self.cleaned_data['email'],
                 email=self.cleaned_data['email'],
-                password=get_user_model().objects.make_random_password(),
+                password=self.cleaned_data['password'],
                 is_staff=True,
                 is_superuser=True,
             )

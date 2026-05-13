@@ -11,6 +11,7 @@
                     <h4 class="card-title">1. Teslimat Adresi</h4>
                     <form id="address-form" method="post">
                         {% csrf_token %}
+                        <input type="hidden" id="payment-intent-id" name="payment_intent_id">
                         {{ form|crispy }}
                     </form>
 
@@ -73,7 +74,7 @@
             submitButton.disabled = true; // Prevent multiple clicks
 
             // Confirm the payment with Stripe. Card details are sent directly to Stripe.
-            const { error } = await stripe.confirmPayment({
+            const { error, paymentIntent } = await stripe.confirmPayment({
                 elements,
                 redirect: 'if_required' // We handle the redirect ourselves
             });
@@ -84,6 +85,7 @@
             } else {
                 // Payment succeeded! Now we submit our address form to our Django backend to create the Order.
                 paymentMessage.textContent = "Ödeme başarılı! Sipariş oluşturuluyor...";
+                document.getElementById('payment-intent-id').value = paymentIntent.id;
                 addressForm.submit();
             }
         });

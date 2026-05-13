@@ -181,6 +181,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # should be used for defining Tenants and their Domains.
 TENANT_MODEL = "store.Tenant"
 TENANT_DOMAIN_MODEL = "store.Domain"
+TENANT_URL_TOKEN = "_"
 
 AUTH_USER_MODEL = 'store.User'
 
@@ -197,6 +198,7 @@ ELASTICSEARCH_DSL = {
         'hosts': f"http://{os.getenv('ELASTICSEARCH_HOST')}:9200",
     },
 }
+ELASTICSEARCH_DSL_AUTOSYNC = os.getenv("ELASTICSEARCH_DSL_AUTOSYNC", "false").lower() == "true"
 
 # ==============================================================================
 # DJANGO REST FRAMEWORK (DRF) CONFIGURATION
@@ -241,6 +243,8 @@ SPECTACULAR_SETTINGS = {
 
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')
+EXCHANGE_RATE_API_KEY = os.getenv('EXCHANGE_RATE_API_KEY', '')
 
 # Dynamically finds the host's IP address to allow the Debug Toolbar to appear.
 hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
@@ -262,5 +266,8 @@ CELERY_RESULT_SERIALIZER = 'json'
 # The absolute filesystem path to the directory that will hold user-uploaded files.
 LOGIN_REDIRECT_URL = '/nexus/dashboard/'
 LOGIN_URL = '/login/'
+SAAS_API_KEY = os.getenv('SAAS_API_KEY', 'demo-tenant-key-123')
+AI_MESSAGE_WEBHOOK_URL = os.getenv('AI_MESSAGE_WEBHOOK_URL', 'http://127.0.0.1:8002/api/v1/webhooks/message-sent')
+AI_SERVICE_BASE_URL = os.getenv('AI_SERVICE_BASE_URL', f"http://127.0.0.1:{os.getenv('AI_PORT', '8002')}")
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

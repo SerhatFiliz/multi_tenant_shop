@@ -12,7 +12,8 @@
 from django.contrib import admin
 from .models import (
     Tenant, Domain, User, Address, Category, Product, ProductVariant,
-    Order, OrderItem, Review, Supplier, PurchaseOrder, PurchaseOrderItem
+    Order, OrderItem, Review, Supplier, PurchaseOrder, PurchaseOrderItem,
+    TenantInvitation, ProductPriceHistory, ExchangeRateCache, StoreSettings, Message
 )
 
 # ==============================================================================
@@ -92,6 +93,13 @@ class OrderAdmin(admin.ModelAdmin):
     list_filter = ('status', 'order_date')
     search_fields = ('user__username', 'id')
 
+
+@admin.register(Message)
+class MessageAdmin(admin.ModelAdmin):
+    list_display = ("id", "store", "sender", "receiver", "sentiment", "is_high_priority", "is_read", "timestamp")
+    list_filter = ("store", "sentiment", "is_high_priority", "is_read", "timestamp")
+    search_fields = ("sender__username", "receiver__username", "content")
+
 # ==============================================================================
 # SIMPLE REGISTRATIONS
 # ==============================================================================
@@ -106,3 +114,7 @@ admin.site.register(Review)
 admin.site.register(Supplier)
 admin.site.register(PurchaseOrder)
 admin.site.register(PurchaseOrderItem)
+admin.site.register(TenantInvitation)
+admin.site.register(ProductPriceHistory)
+admin.site.register(ExchangeRateCache)
+admin.site.register(StoreSettings)

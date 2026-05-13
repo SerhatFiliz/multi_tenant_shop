@@ -10,8 +10,66 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <!-- ApexCharts -->
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <!-- Lucide Icons -->
 <script src="https://unpkg.com/lucide@latest"></script>
+<script>
+window.generateNexusCampaigns = async function(event) {
+    if (event) event.preventDefault();
+    var btn = document.getElementById('campaign-btn');
+    var results = document.getElementById('campaign-results');
+    if (!btn || !results) return;
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    try {
+        var contextResponse = await fetch("{% url 'store:manager_context_json' %}");
+        var context = await contextResponse.json();
+        var response = await fetch("{{ ai_service_base_url }}/api/v1/campaigns/generate", {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(context)
+        });
+        if (!response.ok) throw new Error('Campaign API failed');
+        var data = await response.json();
+        var campaigns = data.campaigns || [];
+        results.innerHTML = campaigns.map(function(campaign) {
+            return '<div class="p-4 rounded-lg border border-indigo-500/30 bg-slate-900/70">' +
+                '<div class="text-indigo-300 text-xs font-bold uppercase">' + campaign.event + '</div>' +
+                '<h4 class="text-white font-semibold mt-1">' + campaign.product_name + '</h4>' +
+                '<p class="text-slate-300 mt-2">' + campaign.reason + '</p>' +
+                '<div class="mt-3 text-slate-400">' + campaign.discount_percent + '% off: ' + campaign.old_price + ' -> ' + campaign.new_price + '</div>' +
+                '<p class="text-xs text-slate-500 mt-2">' + campaign.expected_impact + '</p>' +
+                '<button type="button" onclick="window.applyNexusCampaign(event, this)" class="apply-campaign mt-3 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg" data-variant="' + campaign.variant_id + '" data-discount="' + campaign.discount_percent + '">Uygula</button>' +
+                '</div>';
+        }).join('');
+    } catch (error) {
+        results.innerHTML = '<div class="p-4 rounded-lg border border-red-500/30 bg-red-950/40 text-red-100">Campaign suggestions could not be generated.</div>';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="sparkles"></i> AI Campaign Generator';
+        if (window.lucide) window.lucide.createIcons();
+    }
+};
+window.applyNexusCampaign = async function(event, button) {
+    if (event) event.preventDefault();
+    var body = new FormData();
+    body.append('variant_id', button.dataset.variant);
+    body.append('discount_percent', button.dataset.discount);
+    body.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    var response = await fetch("{% url 'store:apply_campaign' %}", {method: 'POST', body: body});
+    var data = await response.json();
+    if (response.ok) {
+        button.disabled = true;
+        button.textContent = 'Uygulandi';
+    } else {
+        var node = document.createElement('div');
+        node.className = 'fixed right-5 top-24 z-50 bg-slate-900/95 border border-red-500/40 text-white px-4 py-3 rounded-lg shadow-2xl';
+        node.textContent = data.error || 'Campaign could not be applied.';
+        document.body.appendChild(node);
+        setTimeout(function() { node.remove(); }, 3500);
+    }
+};
+</script>
 
 <style>
     body {
@@ -38,9 +96,61 @@
             <h1 class="text-3xl font-bold text-white mb-2">Nexus-Admin Dashboard</h1>
             <p class="text-slate-400">Welcome to your store's command center.</p>
         </div>
-        <button id="campaign-btn" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 px-4 rounded-lg flex items-center gap-2 transition-all">
-            <i data-lucide="sparkles"></i> AI Campaign Generator
-        </button>
+        <div class="flex gap-4">
+            <button onclick="document.getElementById('add-product-modal').classList.remove('hidden')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded-lg flex items-center gap-2 transition-all">
+                <i data-lucide="plus"></i> Add Product
+            </button>
+            <a href="{% url 'store:manager_products' %}" class="bg-slate-800 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded-lg flex items-center gap-2 transition-all no-underline">
+                <i data-lucide="boxes"></i> Ürünlerim
+            </a>
+            <button id="campaign-btn" type="button" onclick="window.generateNexusCampaigns(event)" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 px-4 rounded-lg flex items-center gap-2 transition-all">
+                <i data-lucide="sparkles"></i> AI Campaign Generator
+            </button>
+        </div>
+    </div>
+
+    <!-- Add Product Modal -->
+    <div id="add-product-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="glass-card p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-white">Add New Product</h3>
+                <button onclick="document.getElementById('add-product-modal').classList.add('hidden')" class="text-slate-400 hover:text-white"><i data-lucide="x"></i></button>
+            </div>
+            <form action="{% url 'store:add_product' %}" method="POST" class="space-y-4">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-sm text-slate-300 mb-1">Product Name</label>
+                    <input type="text" name="name" required class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-300 mb-1">Price</label>
+                    <input type="number" step="0.01" name="price" required class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm text-slate-300 mb-1">Cost Price</label>
+                        <input type="number" step="0.01" name="cost_price" required class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-300 mb-1">Cost Currency</label>
+                        <select name="cost_currency" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2">
+                            <option>TRY</option><option>USD</option><option>EUR</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-300 mb-1">Initial Stock</label>
+                    <input type="number" name="stock" required class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-300 mb-1">Description</label>
+                    <textarea name="description" rows="3" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-lg transition-all">
+                    Save Product
+                </button>
+            </form>
+        </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -83,11 +193,52 @@
         </div>
     </div>
 
+    <!-- Phase 2: Product Catalog Overview -->
+    <div class="glass-card p-6 mb-8">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-semibold flex items-center gap-2">
+                <i data-lucide="package" class="text-indigo-400"></i> Product Catalog Overview
+            </h3>
+            <span class="text-xs text-slate-400">Top products in your inventory</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {% for product in products %}
+            <div class="bg-slate-800/40 border border-slate-700 rounded-xl p-4 transition-all hover:border-indigo-500/50 group">
+                <div class="aspect-square rounded-lg bg-slate-900 mb-3 overflow-hidden border border-slate-700">
+                    {% with first_variant=product.variants.first %}
+                        {% if first_variant and first_variant.image %}
+                            {# Using port 8001 as requested for dynamic image lookup #}
+                            <img src="http://localhost:8001{{ first_variant.image.url }}" alt="{{ product.name }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform">
+                        {% else %}
+                            <div class="w-full h-full flex items-center justify-center text-slate-600">
+                                <i data-lucide="image" class="w-8 h-8"></i>
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+                </div>
+                <h4 class="text-white font-medium text-sm truncate mb-1">{{ product.name }}</h4>
+                <div class="flex justify-between items-center">
+                    <span class="text-xs text-slate-400">{{ product.category.name }}</span>
+                    <span class="text-xs font-bold {% if product.total_stock < 10 %}text-red-400{% else %}text-emerald-400{% endif %}">
+                        Stock: {{ product.total_stock }}
+                    </span>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-span-full py-8 text-center text-slate-500">
+                <i data-lucide="search-x" class="w-12 h-12 mx-auto mb-3 opacity-20"></i>
+                <p>No products found. Add your first product to see it here.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Main Chart -->
         <div class="glass-card p-6 lg:col-span-2">
             <h3 class="text-xl font-semibold mb-4">Revenue Trend (30 Days)</h3>
             <div id="revenue-chart"></div>
+            <canvas id="bi-chart" class="mt-6" height="120"></canvas>
         </div>
 
         <!-- AI Insights & Smart Alerts -->
@@ -112,26 +263,66 @@
                 </div>
             </div>
             
-            <!-- Live Chat Routing Toggle -->
             <div class="glass-card p-6">
-                <h3 class="text-lg font-semibold mb-3">Live Chat Override</h3>
-                <label class="flex items-center cursor-pointer">
-                    <div class="relative">
-                        <input type="checkbox" id="live-agent-toggle" class="sr-only">
-                        <div class="block bg-slate-700 w-14 h-8 rounded-full"></div>
-                        <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
-                    </div>
-                    <div class="ml-3 text-slate-300 font-medium">
-                        Take over KOBİ-AI
-                    </div>
-                </label>
-                <p class="text-xs text-slate-400 mt-2">When enabled, AI will pause and you can chat directly with users.</p>
+                <h3 class="text-lg font-semibold mb-3 flex items-center gap-2"><i data-lucide="bot" class="text-cyan-400"></i> Manager AI Advisor</h3>
+                <div id="manager-ai-log" class="bg-slate-950/60 border border-slate-700 rounded-lg p-3 h-44 overflow-y-auto text-sm text-slate-300 mb-3"></div>
+                <form id="manager-ai-form" class="flex gap-2">
+                    <input name="message" class="flex-1 bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm" placeholder="Hangi ürünün stoğu az?">
+                    <button class="bg-cyan-600 hover:bg-cyan-500 text-white px-3 rounded-lg" type="submit">Sor</button>
+                </form>
             </div>
         </div>
     </div>
 
     <!-- Warehouse & Logistics Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+        <div class="glass-card p-6 lg:col-span-2">
+            <div class="flex items-center justify-between gap-4 mb-4">
+                <h3 class="text-xl font-semibold flex items-center gap-2">
+                    <i data-lucide="messages-square" class="text-cyan-400"></i> Mesaj Merkezi
+                </h3>
+                <span class="text-xs px-3 py-1 rounded-full bg-slate-800 text-slate-300">{{ unread_message_count }} unread</span>
+            </div>
+            <div id="manager-message-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% for message in store_messages %}
+                <div class="p-4 rounded-lg border {% if message.is_high_priority %}border-red-500/50 bg-red-950/30{% else %}border-slate-700 bg-slate-800/40{% endif %}">
+                    <div class="flex items-start justify-between gap-3 mb-2">
+                        <div>
+                            <p class="font-semibold text-white">{{ message.sender.email|default:message.sender.username }}</p>
+                            <p class="text-xs text-slate-400">{{ message.timestamp|date:"M d, H:i" }} · {{ message.sentiment }}</p>
+                        </div>
+                        {% if message.is_high_priority %}
+                        <span class="text-xs font-bold px-2 py-1 rounded-full bg-red-500/20 text-red-200 border border-red-500/40">High Priority</span>
+                        {% elif not message.is_read %}
+                        <span class="text-xs font-bold px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-200 border border-cyan-500/40">New</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-sm text-slate-200 leading-relaxed mb-3">{{ message.content }}</p>
+                    <form action="{% url 'store:reply_message' message.id %}" method="POST" class="space-y-2">
+                        {% csrf_token %}
+                        <textarea name="content" rows="2" required placeholder="Write a reply..." class="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm"></textarea>
+                        <button type="submit" class="bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-2 rounded-lg text-sm font-medium">Reply</button>
+                    </form>
+                </div>
+                {% empty %}
+                <p class="text-slate-400">No customer messages yet.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="glass-card p-6">
+            <h3 class="text-xl font-semibold mb-4 flex items-center gap-2"><i data-lucide="calendar-days" class="text-cyan-400"></i> AI Strategy Calendar</h3>
+            <div id="strategy-calendar" class="space-y-3 text-sm text-slate-300">Loading campaign opportunities...</div>
+        </div>
+        <div class="glass-card p-6">
+            <h3 class="text-xl font-semibold mb-4 flex items-center gap-2"><i data-lucide="users" class="text-emerald-400"></i> Invite Team</h3>
+            <form action="{% url 'store:invite_user' %}" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {% csrf_token %}
+                {{ invite_form.email }}
+                {{ invite_form.role }}
+                <button class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg" type="submit">Invite</button>
+            </form>
+        </div>
         <!-- Recent Orders -->
         <div class="glass-card p-6">
             <h3 class="text-xl font-semibold mb-4">Recent Orders</h3>
@@ -212,26 +403,46 @@
             </div>
         </div>
     </div>
+    <div class="glass-card p-6 mt-8">
+        <h3 class="text-xl font-semibold mb-4 flex items-center gap-2"><i data-lucide="megaphone" class="text-indigo-400"></i> AI Campaign Suggestions</h3>
+        <div id="campaign-results" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+            {% for campaign in campaign_suggestions %}
+            <div class="p-4 rounded-lg border border-indigo-500/30 bg-slate-900/70">
+                <div class="text-indigo-300 text-xs font-bold uppercase">{{ campaign.event }}</div>
+                <h4 class="text-white font-semibold mt-1">{{ campaign.product_name }}</h4>
+                <p class="text-slate-300 mt-2">{{ campaign.reason }}</p>
+                <div class="mt-3 text-slate-400">{{ campaign.discount_percent }}% off: {{ campaign.old_price }} -> {{ campaign.new_price }}</div>
+                <p class="text-xs text-slate-500 mt-2">{{ campaign.expected_impact }}</p>
+                <form method="post" action="{% url 'store:apply_campaign' %}" class="mt-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="variant_id" value="{{ campaign.variant_id }}">
+                    <input type="hidden" name="discount_percent" value="{{ campaign.discount_percent }}">
+                    <input type="hidden" name="redirect" value="1">
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg">Uygula</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="glass-card p-6 mt-8">
+        <h3 class="text-xl font-semibold mb-4">Analyze Market</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {% for variant in variants %}
+            <button class="market-btn bg-slate-800 hover:bg-slate-700 text-left p-3 rounded-lg" data-name="{{ variant.product.name }}" data-cost="{{ variant.cost_price }}" data-margin="{{ store_settings.target_profit_margin }}">
+                {{ variant.product.name }}<br><span class="text-xs text-slate-400">{{ variant.sku }}</span>
+            </button>
+            {% endfor %}
+        </div>
+        <pre id="market-result" class="mt-4 bg-black/40 p-4 rounded-lg text-xs overflow-auto"></pre>
+    </div>
 </div>
 
 <script>
     // Initialize Icons
     lucide.createIcons();
 
-    // Toggle switch logic
-    const toggle = document.getElementById('live-agent-toggle');
-    const dot = document.querySelector('.dot');
-    toggle.addEventListener('change', async function() {
-        if(this.checked) {
-            dot.style.transform = 'translateX(100%)';
-            dot.classList.add('bg-emerald-400');
-            await fetch(`http://127.0.0.1:8001/api/v1/chat/override?override=true`, {method: 'POST'});
-        } else {
-            dot.style.transform = 'translateX(0)';
-            dot.classList.remove('bg-emerald-400');
-            await fetch(`http://127.0.0.1:8001/api/v1/chat/override?override=false`, {method: 'POST'});
-        }
-    });
+    const AI_BASE_URL = "{{ ai_service_base_url }}";
+    const STORE_SLUG = "{{ store_slug }}";
 
     // Initialize Chart
     var options = {
@@ -274,20 +485,31 @@
     // Fetch Analytics from FastAPI
     async function fetchAnalytics() {
         try {
-            // Stats
-            const statsRes = await fetch('http://127.0.0.1:8001/api/v1/analytics/dashboard-stats');
-            const stats = await statsRes.json();
+            const contextRes = await fetch("{% url 'store:manager_context_json' %}");
+            const context = await contextRes.json();
+            const summaryRes = await fetch(`${AI_BASE_URL}/api/v1/manager/summary?store=${encodeURIComponent(STORE_SLUG)}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(context)
+            });
+            const summary = await summaryRes.json();
+            const stats = {
+                total_revenue: context.orders.revenue,
+                pending_orders: context.orders.pending,
+                growth_rate: 0,
+                top_categories: []
+            };
             
             document.getElementById('monthly-revenue').innerText = '$' + stats.total_revenue.toLocaleString();
             document.getElementById('profit-loss').innerText = stats.pending_orders + ' Pending';
             
-            let summary = `<p><strong>Growth Rate:</strong> +${stats.growth_rate}%</p>
-                           <p class="mt-2 text-xs">Top Categories:</p><ul class="list-disc pl-4 text-xs mt-1">`;
-            stats.top_categories.forEach(c => {
-                summary += `<li>${c.name} (${c.sales} sales)</li>`;
-            });
-            summary += '</ul>';
-            document.getElementById('ai-summary').innerHTML = summary;
+            document.getElementById('ai-summary').innerHTML = `
+                <p>${summary.summary}</p>
+                <p class="mt-3 text-xs text-slate-400">Risks</p>
+                <ul class="list-disc pl-4 text-xs mt-1">${(summary.risks || []).map(x => `<li>${x}</li>`).join('')}</ul>
+                <p class="mt-3 text-xs text-slate-400">Opportunities</p>
+                <ul class="list-disc pl-4 text-xs mt-1">${(summary.opportunities || []).map(x => `<li>${x}</li>`).join('')}</ul>
+            `;
             
             // Check for shipping anomalies
             if(stats.pending_orders > 0) {
@@ -300,9 +522,7 @@
                 alertsDiv.classList.add('animate-pulse');
             }
 
-            // Charts
-            const chartsRes = await fetch('http://127.0.0.1:8001/api/v1/analytics/sales-charts');
-            const chartData = await chartsRes.json();
+            const chartData = { dates: context.products.map(p => p.name), revenues: context.products.map(p => p.sold_units * p.price) };
             
             chart.updateOptions({
                 xaxis: { categories: chartData.dates }
@@ -314,22 +534,222 @@
             
         } catch (error) {
             console.error('Failed to fetch analytics', error);
-            document.getElementById('ai-summary').innerText = 'Failed to load AI summary. Is FastAPI running?';
+            document.getElementById('ai-summary').innerText = 'AI summary could not load. FastAPI bridge unavailable.';
         }
     }
 
     // Load Data
     fetchAnalytics();
 
-    // AI Campaign Generator
-    document.getElementById('campaign-btn').addEventListener('click', function() {
+    fetch("{% url 'store:finance_json' %}").then(r => r.json()).then(data => {
+        const daily = data.daily || [];
+        new Chart(document.getElementById('bi-chart'), {
+            type: 'bar',
+            data: {
+                labels: daily.map(x => x.label),
+                datasets: [
+                    { label: 'Revenue', data: daily.map(x => x.revenue), backgroundColor: '#14b8a6' },
+                    { label: 'Orders', data: daily.map(x => x.orders), backgroundColor: '#f59e0b' }
+                ]
+            },
+            options: { plugins: { legend: { labels: { color: '#cbd5e1' } } }, scales: { x: { ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8' } } } }
+        });
+    });
+
+    fetch(`${AI_BASE_URL}/api/v1/strategy-calendar`).then(r => r.json()).then(data => {
+        document.getElementById('strategy-calendar').innerHTML = data.suggestions.map(s => `
+            <div class="p-3 rounded-lg bg-slate-800/70 border border-slate-700">
+                <strong>${s.event}</strong> in ${s.days_until} days<br>${s.suggestion}
+            </div>`).join('');
+    }).catch(() => document.getElementById('strategy-calendar').innerText = 'FastAPI strategy service unavailable.');
+
+    document.querySelectorAll('.market-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const body = { product_name: btn.dataset.name, cost_price: Number(btn.dataset.cost), target_profit_margin: Number(btn.dataset.margin) };
+            const res = await fetch(`${AI_BASE_URL}/api/v1/market-intelligence-agent`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            document.getElementById('market-result').textContent = JSON.stringify(await res.json(), null, 2);
+        });
+    });
+
+    function showToast(message) {
+        const toast = document.createElement('div');
+        toast.className = 'fixed right-5 top-24 z-50 bg-slate-900/95 border border-indigo-500/40 text-white px-4 py-3 rounded-lg shadow-2xl';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3500);
+    }
+
+    document.getElementById('campaign-btn').addEventListener('click', async function() {
         this.innerHTML = '<i data-lucide="loader" class="animate-spin"></i> Generating...';
         lucide.createIcons();
-        setTimeout(() => {
-            alert('AI Suggestion: Run a "Weekend Flash Sale" offering 15% off low-velocity stock to boost conversions.');
+        try {
+            const context = await (await fetch("{% url 'store:manager_context_json' %}")).json();
+            const res = await fetch(`${AI_BASE_URL}/api/v1/campaigns/generate`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(context)
+            });
+            const data = await res.json();
+            const campaigns = data.campaigns || data;
+            document.getElementById('campaign-results').innerHTML = campaigns.map(c => `
+                <div class="p-4 rounded-lg border border-indigo-500/30 bg-slate-900/70">
+                    <div class="text-indigo-300 text-xs font-bold uppercase">${c.event}</div>
+                    <h4 class="text-white font-semibold mt-1">${c.product_name}</h4>
+                    <p class="text-slate-300 mt-2">${c.reason}</p>
+                    <div class="mt-3 text-slate-400">${c.discount_percent}% off: ${c.old_price} → ${c.new_price}</div>
+                    <p class="text-xs text-slate-500 mt-2">${c.expected_impact}</p>
+                    <button class="apply-campaign mt-3 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg" data-variant="${c.variant_id}" data-discount="${c.discount_percent}">Uygula</button>
+                </div>
+            `).join('');
+        } catch (error) {
+            showToast('Campaign suggestions could not be generated.');
+        } finally {
             this.innerHTML = '<i data-lucide="sparkles"></i> AI Campaign Generator';
             lucide.createIcons();
-        }, 1500);
+        }
     });
+
+    document.getElementById('campaign-results').addEventListener('click', async (event) => {
+        const button = event.target.closest('.apply-campaign');
+        if (!button) return;
+        const body = new FormData();
+        body.append('variant_id', button.dataset.variant);
+        body.append('discount_percent', button.dataset.discount);
+        body.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        const res = await fetch("{% url 'store:apply_campaign' %}", { method: 'POST', body });
+        const data = await res.json();
+        if (res.ok) {
+            showToast(`Kampanya uygulandı: ${data.product} %${data.discount_percent}`);
+            button.disabled = true;
+            button.textContent = 'Uygulandı';
+        } else {
+            showToast(data.error || 'Campaign could not be applied.');
+        }
+    });
+
+    const advisorLog = document.getElementById('manager-ai-log');
+    document.getElementById('manager-ai-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const input = event.currentTarget.querySelector('input[name="message"]');
+        const message = input.value.trim();
+        if (!message) return;
+        advisorLog.innerHTML += `<div class="text-right text-indigo-200 mb-2">${message}</div>`;
+        input.value = '';
+        const context = await (await fetch("{% url 'store:manager_context_json' %}")).json();
+        const res = await fetch(`${AI_BASE_URL}/api/v1/manager-advisor/chat`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({store_slug: STORE_SLUG, message, context})
+        });
+        const data = await res.json();
+        advisorLog.innerHTML += `<div class="text-left text-slate-200 mb-2">${data.answer}</div>`;
+        advisorLog.scrollTop = advisorLog.scrollHeight;
+    });
+
+    let managerLastMessageId = {{ last_message_id|default:0 }};
+    function renderManagerMessage(message) {
+        if (document.getElementById(`manager-message-${message.id}`)) return;
+        const card = document.createElement('div');
+        card.id = `manager-message-${message.id}`;
+        card.className = 'p-4 rounded-lg border border-cyan-500/40 bg-slate-800/50';
+        card.innerHTML = `
+            <div class="flex items-start justify-between gap-3 mb-2">
+                <div><p class="font-semibold text-white">${message.sender}</p><p class="text-xs text-slate-400">${message.timestamp} · ${message.sentiment}</p></div>
+                ${message.is_high_priority ? '<span class="text-xs font-bold px-2 py-1 rounded-full bg-red-500/20 text-red-200 border border-red-500/40">High Priority</span>' : '<span class="text-xs font-bold px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-200 border border-cyan-500/40">New</span>'}
+            </div>
+            <p class="text-sm text-slate-200 leading-relaxed mb-3">${message.content}</p>
+            <form class="manager-reply-json space-y-2" data-customer="${message.customer_id}">
+                <input name="content" required placeholder="Reply..." class="w-full bg-slate-950 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm">
+                <button type="submit" class="bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-2 rounded-lg text-sm font-medium">Reply</button>
+            </form>`;
+        document.getElementById('manager-message-grid').prepend(card);
+        managerLastMessageId = Math.max(managerLastMessageId, message.id);
+    }
+    async function pollManagerMessages() {
+        const res = await fetch(`{% url 'store:manager_messages_poll' %}?after_id=${managerLastMessageId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        (data.messages || []).forEach(renderManagerMessage);
+    }
+    document.getElementById('manager-message-grid').addEventListener('submit', async (event) => {
+        const form = event.target.closest('.manager-reply-json');
+        if (!form) return;
+        event.preventDefault();
+        const body = new FormData(form);
+        body.append('customer_id', form.dataset.customer);
+        body.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        const res = await fetch("{% url 'store:reply_message_json' %}", { method: 'POST', body });
+        if (res.ok) {
+            form.querySelector('input').value = '';
+            showToast('Reply sent.');
+        }
+    });
+    setInterval(pollManagerMessages, 2500);
+</script>
+<script>
+(() => {
+    const btn = document.getElementById('campaign-btn');
+    const results = document.getElementById('campaign-results');
+    if (!btn || !results) return;
+
+    const toast = (message) => {
+        const node = document.createElement('div');
+        node.className = 'fixed right-5 top-24 z-50 bg-slate-900/95 border border-indigo-500/40 text-white px-4 py-3 rounded-lg shadow-2xl';
+        node.textContent = message;
+        document.body.appendChild(node);
+        setTimeout(() => node.remove(), 3500);
+    };
+
+    btn.onclick = async () => {
+        btn.disabled = true;
+        btn.textContent = 'Generating...';
+        try {
+            const context = await (await fetch("{% url 'store:manager_context_json' %}")).json();
+            const response = await fetch("{{ ai_service_base_url }}/api/v1/campaigns/generate", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(context),
+            });
+            if (!response.ok) throw new Error('Campaign API failed');
+            const data = await response.json();
+            const campaigns = data.campaigns || [];
+            results.innerHTML = campaigns.map((campaign) => `
+                <div class="p-4 rounded-lg border border-indigo-500/30 bg-slate-900/70">
+                    <div class="text-indigo-300 text-xs font-bold uppercase">${campaign.event}</div>
+                    <h4 class="text-white font-semibold mt-1">${campaign.product_name}</h4>
+                    <p class="text-slate-300 mt-2">${campaign.reason}</p>
+                    <div class="mt-3 text-slate-400">${campaign.discount_percent}% off: ${campaign.old_price} -> ${campaign.new_price}</div>
+                    <p class="text-xs text-slate-500 mt-2">${campaign.expected_impact}</p>
+                    <button class="apply-campaign mt-3 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg" data-variant="${campaign.variant_id}" data-discount="${campaign.discount_percent}">Uygula</button>
+                </div>
+            `).join('');
+            if (!campaigns.length) toast('No campaign candidates found.');
+        } catch (error) {
+            toast('Campaign suggestions could not be generated.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="sparkles"></i> AI Campaign Generator';
+            window.lucide?.createIcons();
+        }
+    };
+
+    results.onclick = async (event) => {
+        const button = event.target.closest('.apply-campaign');
+        if (!button) return;
+        const body = new FormData();
+        body.append('variant_id', button.dataset.variant);
+        body.append('discount_percent', button.dataset.discount);
+        body.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        const response = await fetch("{% url 'store:apply_campaign' %}", {method: 'POST', body});
+        const data = await response.json();
+        if (response.ok) {
+            button.disabled = true;
+            button.textContent = 'Uygulandi';
+            toast(`Kampanya uygulandi: ${data.product} %${data.discount_percent}`);
+        } else {
+            toast(data.error || 'Campaign could not be applied.');
+        }
+    };
+})();
 </script>
 {% endblock %}

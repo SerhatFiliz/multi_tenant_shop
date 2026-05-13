@@ -32,29 +32,30 @@
 <section class="onboard-shell">
     <div class="onboard-story">
         <div class="story-content">
-            <div class="onboard-eyebrow"><i data-lucide="sparkles" width="16" height="16"></i> B2B SaaS Onboarding</div>
+            <div class="onboard-eyebrow"><i data-lucide="sparkles" width="16" height="16"></i> Store Onboarding</div>
             <h1 class="onboard-title">Join the AI-Powered B2B Ecosystem</h1>
-            <p class="onboard-copy">Create a premium storefront with isolated tenant data, AI-assisted customer support, analytics, and a Nexus command center built for operators.</p>
+            <p class="onboard-copy">Launch a tenant-isolated storefront with AI-assisted search, customer messaging, finance analytics, and a Nexus command center from day one.</p>
             <div class="signal-grid">
-                <div class="signal"><strong>AI</strong><span>Smart commerce assistant</span></div>
-                <div class="signal"><strong>Nexus</strong><span>Manager command center</span></div>
-                <div class="signal"><strong>Secure</strong><span>Tenant-aware architecture</span></div>
+                <div class="signal"><strong>24/7</strong><span>AI customer assistance</span></div>
+                <div class="signal"><strong>Secure</strong><span>Tenant data boundaries</span></div>
+                <div class="signal"><strong>Live</strong><span>Revenue and order intelligence</span></div>
             </div>
         </div>
         <div class="metric-grid">
-            <div class="metric"><b>Message Intelligence</b>High-priority customer issues surface instantly.</div>
-            <div class="metric"><b>Commerce Ready</b>Products, orders, and analytics work from launch.</div>
+            <div class="metric"><b>Command Center</b>Manage orders, products, messages, and priority alerts from Nexus.</div>
+            <div class="metric"><b>Faster Launch</b>Your store schema, manager account, and domains are provisioned in one flow.</div>
         </div>
     </div>
 
     <aside class="onboard-form">
         <h1>Yeni Bir Mağaza Aç</h1>
-        <p class="mb-4">Provision your store and create the first Store Manager account.</p>
-        <form method="post" novalidate>
+        <p class="mb-4">Create your StoreManager account and launch your premium storefront.</p>
+        <form method="post">
             {% csrf_token %}
             {{ form|crispy }}
-            <button type="submit" class="launch-btn mt-3">Mağazayı Oluştur</button>
+            <button class="launch-btn mt-3" type="submit">Launch Store</button>
         </form>
+        <p class="mt-3 mb-0" style="font-size:.86rem;">Already operating a store? <a href="{% url 'store_management:login' %}" style="color:#93c5fd;text-decoration:none;font-weight:800;">Go to manager login</a></p>
     </aside>
 </section>
 {% endblock %}

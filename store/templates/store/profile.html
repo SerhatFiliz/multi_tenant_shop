@@ -1,72 +1,144 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-5">
-    <h1 class="mb-4">Profilim: {% if user.first_name %}{{ user.first_name }}{% else %}{{ user.username }}{% endif %}</h1>
-    
-    <div class="card mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h4>Kayıtlı Adreslerim</h4>
-            <a href="{% url 'store:add_address' %}" class="btn btn-sm btn-primary">Yeni Adres Ekle</a>
+<style>
+    .account-shell { display: grid; gap: 1.25rem; }
+    .account-header { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; flex-wrap: wrap; }
+    .account-kicker { color: var(--brand-accent); font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .account-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, .9fr); gap: 1rem; }
+    .panel { background: var(--bg-card); border: 1px solid var(--surface-glass-border); border-radius: 8px; padding: 1.25rem; box-shadow: var(--shadow-card); }
+    .panel h2 { font-size: 1.05rem; margin-bottom: 1rem; font-weight: 800; }
+    .order-card { border: 1px solid rgba(255,255,255,.1); border-radius: 8px; padding: 1rem; margin-bottom: .85rem; background: rgba(255,255,255,.03); }
+    .order-top { display: flex; justify-content: space-between; gap: .75rem; flex-wrap: wrap; margin-bottom: .9rem; }
+    .status-rail { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; position: relative; }
+    .status-step { min-height: 52px; border-radius: 8px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04); padding: .65rem; color: var(--text-secondary); font-size: .78rem; font-weight: 700; }
+    .status-step.done { background: rgba(20,184,166,.16); border-color: rgba(20,184,166,.38); color: #5eead4; }
+    .status-step.current { background: rgba(99,102,241,.18); border-color: rgba(99,102,241,.5); color: #c7d2fe; }
+    .compact-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    .compact-table th, .compact-table td { padding: .75rem .5rem; border-bottom: 1px solid rgba(255,255,255,.08); color: var(--text-secondary); }
+    .compact-table th { color: var(--text-primary); font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; }
+    .message { border-left: 3px solid var(--brand-primary); padding: .8rem .9rem; background: rgba(255,255,255,.04); border-radius: 0 8px 8px 0; margin-bottom: .75rem; }
+    .message.priority { border-left-color: #ef4444; background: rgba(239,68,68,.1); }
+    .priority-badge { display: inline-flex; align-items: center; gap: .25rem; background: rgba(239,68,68,.18); color: #fca5a5; border: 1px solid rgba(239,68,68,.35); padding: .18rem .45rem; border-radius: 999px; font-size: .7rem; font-weight: 800; }
+    .muted { color: var(--text-secondary); }
+    @media (max-width: 920px) { .account-grid { grid-template-columns: 1fr; } }
+</style>
+
+<div class="account-shell">
+    <header class="account-header">
+        <div>
+            <div class="account-kicker">Customer Profile</div>
+            <h1 style="font-weight:900;margin:.25rem 0;">Hesap Panelim</h1>
+            <p class="muted">Siparişlerinizi, favorilerinizi ve mağaza mesajlarınızı tek yerden takip edin.</p>
         </div>
-        <div class="card-body">
-            <div class="row">
-                {% for address in addresses %}
-                    <div class="col-md-6 mb-3">
-                        <div class="card h-100">
-                            <div class="card-body">
-                                <h5 class="card-title">{{ address.address_title|default:"Adres" }}</h5>
-                                <p class="card-text mb-1"><strong>{{ address.full_name }}</strong></p>
-                                <p class="card-text mb-1">{{ address.address_line_1 }}</p>
-                                <p class="card-text mb-1">{{ address.postal_code }} {{ address.city }}</p>
-                                <p class="card-text">{{ address.phone_number }}</p>
-                                <a href="{% url 'store:edit_address' address.id %}" class="btn btn-sm btn-secondary">Düzenle</a>
-                                <form action="{% url 'store:delete_address' address.id %}" method="post" class="d-inline">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Bu adresi silmek istediğinizden emin misiniz?')">Sil</button>
-                                </form>
-                            </div>
-                        </div>
+        <a href="{% url 'store:product_list' %}" class="btn-nexus-primary">
+            <i data-lucide="shopping-bag" width="16" height="16" style="margin-right:6px;"></i>Alışverişe Devam Et
+        </a>
+    </header>
+
+    <div class="account-grid">
+        <section class="panel">
+            <h2>Aktif Siparişlerim</h2>
+            {% for order in active_orders %}
+            <article class="order-card">
+                <div class="order-top">
+                    <div>
+                        <strong>#{{ order.id }}</strong>
+                        <div class="muted">{{ order.order_date|date:"d M Y H:i" }}</div>
                     </div>
-                {% empty %}
-                    <p>Henüz kayıtlı bir adresiniz bulunmamaktadır.</p>
-                {% endfor %}
+                    <div style="text-align:right;">
+                        <strong>{{ order.total_amount }} {{ order.currency }}</strong>
+                        <div class="muted">{{ order.get_status_display }}</div>
+                    </div>
+                </div>
+                <div class="status-rail">
+                    <div class="status-step {% if order.status == 'processing' %}current{% elif order.status == 'shipped' or order.status == 'delivered' %}done{% endif %}">Processing</div>
+                    <div class="status-step {% if order.status == 'shipped' %}current{% elif order.status == 'delivered' %}done{% endif %}">Shipped</div>
+                    <div class="status-step {% if order.status == 'delivered' %}done current{% endif %}">Delivered</div>
+                </div>
+                <div class="muted" style="margin-top:.8rem;font-size:.82rem;">
+                    {% for item in order.items.all %}{{ item.quantity }}x {{ item.product_variant.product.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                </div>
+            </article>
+            {% empty %}
+            <p class="muted">Şu anda aktif siparişiniz yok.</p>
+            {% endfor %}
+        </section>
+
+        <aside class="panel">
+            <h2>Mesajlarım</h2>
+            {% for message in customer_messages %}
+            <div class="message {% if message.is_high_priority %}priority{% endif %}">
+                <div style="display:flex;justify-content:space-between;gap:.5rem;margin-bottom:.35rem;">
+                    <strong>{{ message.store.name }}</strong>
+                    {% if message.is_high_priority %}<span class="priority-badge">High Priority</span>{% endif %}
+                </div>
+                <p style="margin:0 0 .4rem;">{{ message.content }}</p>
+                <small class="muted">{{ message.timestamp|date:"d M Y H:i" }} · {{ message.sentiment }}</small>
             </div>
-        </div>
+            {% empty %}
+            <p class="muted">Henüz mağazaya mesaj göndermediniz.</p>
+            {% endfor %}
+        </aside>
     </div>
 
-    <div class="card">
-        <div class="card-header">
-            <h4>Sipariş Geçmişim</h4>
-        </div>
-        <div class="card-body">
-            {% if orders %}
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th scope="col">Sipariş ID</th>
-                                <th scope="col">Tarih</th>
-                                <th scope="col">Toplam Tutar</th>
-                                <th scope="col">Durum</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for order in orders %}
-                            <tr>
-                                <td>#{{ order.id }}</td>
-                                <td>{{ order.order_date|date:"d F Y" }}</td>
-                                <td>{{ order.total_amount }} TL</td>
-                                <td><span class="badge bg-primary">{{ order.get_status_display }}</span></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+    <div class="account-grid">
+        <section class="panel">
+            <h2>Sipariş Geçmişi</h2>
+            {% if order_history %}
+            <div style="overflow-x:auto;">
+                <table class="compact-table">
+                    <thead><tr><th>Sipariş</th><th>Tarih</th><th>Tutar</th><th>Durum</th></tr></thead>
+                    <tbody>
+                    {% for order in order_history %}
+                    <tr>
+                        <td>#{{ order.id }}</td>
+                        <td>{{ order.order_date|date:"d M Y" }}</td>
+                        <td>{{ order.total_amount }} {{ order.currency }}</td>
+                        <td>{{ order.get_status_display }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="muted">Tamamlanmış siparişiniz henüz yok.</p>
+            {% endif %}
+        </section>
+
+        <aside class="panel">
+            <h2>Favori Ürünlerim</h2>
+            {% if wishlist.products.all %}
+                <div style="display:grid;gap:.65rem;">
+                {% for product in wishlist.products.all %}
+                    <a href="{% url 'store:product_detail' product.slug %}" style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;color:var(--text-primary);text-decoration:none;border:1px solid rgba(255,255,255,.09);border-radius:8px;padding:.75rem;">
+                        <span>{{ product.name }}</span>
+                        <i data-lucide="chevron-right" width="16" height="16"></i>
+                    </a>
+                {% endfor %}
                 </div>
             {% else %}
-                <p>Henüz hiç sipariş vermediniz.</p>
+                <p class="muted">Favori ürün listeniz boş.</p>
             {% endif %}
-        </div>
+        </aside>
     </div>
+
+    <section class="panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+            <h2 style="margin:0;">Kayıtlı Adreslerim</h2>
+            <a href="{% url 'store:add_address' %}" class="btn-nexus-ghost">Yeni Adres Ekle</a>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.8rem;margin-top:1rem;">
+            {% for address in addresses %}
+            <div style="border:1px solid rgba(255,255,255,.09);border-radius:8px;padding:1rem;">
+                <strong>{{ address.address_title|default:"Adres" }}</strong>
+                <p class="muted" style="margin:.5rem 0;">{{ address.full_name }}<br>{{ address.address_line_1 }}<br>{{ address.postal_code }} {{ address.city }}</p>
+                <a href="{% url 'store:edit_address' address.id %}" class="btn-nexus-ghost">Düzenle</a>
+            </div>
+            {% empty %}
+            <p class="muted">Henüz kayıtlı adresiniz yok.</p>
+            {% endfor %}
+        </div>
+    </section>
 </div>
 {% endblock content %}

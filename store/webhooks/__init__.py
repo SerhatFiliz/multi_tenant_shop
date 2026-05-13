@@ -1,0 +1,2 @@
+"""Store webhook compatibility package."""
+

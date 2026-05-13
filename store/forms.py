@@ -2,7 +2,7 @@
 
 # Import the forms module from Django and our Address model.
 from django import forms
-from .models import Address, User, Review
+from .models import Address, User, Review, TenantInvitation
 from django.contrib.auth.forms import UserCreationForm
 
 # We are creating a ModelForm. This special type of form is automatically
@@ -47,6 +47,31 @@ class CustomUserCreationForm(UserCreationForm):
         fields = ('username', 'email', 'first_name', 'last_name')
 
 
+class SelfServiceRegistrationForm(forms.Form):
+    store_name = forms.CharField(max_length=100)
+    first_name = forms.CharField(max_length=100)
+    last_name = forms.CharField(max_length=100)
+    email = forms.EmailField()
+    password = forms.CharField(widget=forms.PasswordInput)
+    confirm_password = forms.CharField(widget=forms.PasswordInput)
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("password") != cleaned.get("confirm_password"):
+            self.add_error("confirm_password", "Passwords do not match.")
+        return cleaned
+
+
+class TenantInviteForm(forms.ModelForm):
+    class Meta:
+        model = TenantInvitation
+        fields = ["email", "role"]
+        widgets = {
+            "email": forms.EmailInput(attrs={"class": "form-control"}),
+            "role": forms.Select(attrs={"class": "form-select"}),
+        }
+
+
 class ReviewForm(forms.ModelForm):
     # We create a custom field for the rating using a ChoiceField with a Select widget.
     # This will render as a dropdown menu (1, 2, 3, 4, 5).
@@ -69,14 +94,13 @@ class ReviewForm(forms.ModelForm):
         }
         
         
-class CheckoutForm(forms.Form):
+class CheckoutForm(forms.ModelForm):
     """
     Form for collecting customer information during checkout.
     """
-    first_name = forms.CharField(label="Ad", max_length=100)
-    last_name = forms.CharField(label="Soyad", max_length=100)
-    email = forms.EmailField(label="E-posta Adresi")
-    phone_number = forms.CharField(label="Telefon Numarası", max_length=15, required=False)
-    address = forms.CharField(label="Adres", widget=forms.Textarea)
-    city = forms.CharField(label="Şehir", max_length=100)
-    zip_code = forms.CharField(label="Posta Kodu", max_length=10)
+    class Meta:
+        model = Address
+        exclude = ["user", "is_default"]
+        widgets = {
+            "address_line_1": forms.Textarea(attrs={"rows": 3}),
+        }

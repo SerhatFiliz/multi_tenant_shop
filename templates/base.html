@@ -44,8 +44,8 @@
             --bg-dark:         #0a0a0f;
             --bg-card:         #0f1117;
             --bg-card-hover:   #141620;
-            --radius-card:     16px;
-            --radius-btn:      10px;
+            --radius-card:     8px;
+            --radius-btn:      8px;
             --shadow-card:     0 4px 24px rgba(0,0,0,0.35);
             --shadow-hover:    0 12px 40px rgba(99,102,241,0.25);
             --nav-height:      68px;
@@ -245,8 +245,17 @@
 
         /* Dropdown */
         .nexus-dropdown { position: relative; }
+        .nexus-dropdown::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            height: 12px;
+            display: block;
+        }
         .nexus-dropdown-menu {
-            display: none;
+            display: block; opacity: 0; visibility: hidden; transition: all 0.2s; transition-delay: 0.1s;
             position: absolute;
             right: 0;
             top: calc(100% + 8px);
@@ -258,7 +267,13 @@
             box-shadow: 0 16px 48px rgba(0,0,0,0.5);
             z-index: 999;
         }
-        .nexus-dropdown:hover .nexus-dropdown-menu { display: block; }
+        .nexus-dropdown:hover .nexus-dropdown-menu,
+        .nexus-dropdown:focus-within .nexus-dropdown-menu { 
+            opacity: 1; 
+            visibility: visible; 
+            transform: translateY(0);
+            transition-delay: 0s;
+        }
         .nexus-dropdown-menu a {
             display: block;
             padding: 9px 14px;
@@ -273,7 +288,7 @@
 
         /* Mobile toggle */
         .nexus-mobile-toggle {
-            display: none;
+            display: block; opacity: 0; visibility: hidden; transition: all 0.2s; transition-delay: 0.1s;
             background: none;
             border: 1px solid var(--surface-glass-border);
             border-radius: 8px;
@@ -295,10 +310,11 @@
            CARD STYLES
         ================================================================ */
         .nexus-card {
-            background: var(--bg-card);
+            background: rgba(15, 17, 27, .74);
             border: 1px solid var(--surface-glass-border);
             border-radius: var(--radius-card);
             box-shadow: var(--shadow-card);
+            backdrop-filter: blur(18px);
             transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
             overflow: hidden;
         }
@@ -313,12 +329,42 @@
         ================================================================ */
         .nexus-footer {
             border-top: 1px solid var(--surface-glass-border);
-            padding: 2rem 1.5rem;
-            text-align: center;
+            padding: 0;
             color: var(--text-muted);
             font-size: 0.8125rem;
+            background: rgba(10,10,15,.78);
+            backdrop-filter: blur(18px);
         }
         .nexus-footer a { color: var(--brand-primary); text-decoration: none; }
+        .footer-inner {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 2.25rem 1.5rem;
+            display: grid;
+            grid-template-columns: minmax(220px, 1.2fr) repeat(3, minmax(130px, .6fr));
+            gap: 1.5rem;
+            text-align: left;
+        }
+        .footer-brand { color: var(--text-primary); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.1rem; font-weight: 900; margin-bottom: .6rem; }
+        .footer-col h3 { color: var(--text-primary); font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; margin-bottom: .75rem; font-weight: 900; }
+        .footer-col a { display: block; color: var(--text-secondary); margin: .45rem 0; }
+        .footer-social { display: flex; gap: .55rem; margin-top: .9rem; }
+        .footer-social a { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; background: var(--surface-glass); border: 1px solid var(--surface-glass-border); color: var(--text-primary); }
+        .footer-bottom { max-width: 1280px; margin: 0 auto; padding: 1rem 1.5rem 1.5rem; border-top: 1px solid rgba(255,255,255,.08); color: var(--text-muted); }
+        .live-support-launcher { position: fixed; right: 22px; bottom: 22px; z-index: 1100; display: flex; align-items: center; gap: 8px; border: 0; border-radius: 999px; color: #fff; font-weight: 900; padding: 12px 18px; background: linear-gradient(135deg, #2563eb 0%, #7c3aed 55%, #06b6d4 100%); box-shadow: 0 18px 44px rgba(99,102,241,.42); }
+        .live-support-panel { position: fixed; right: 22px; bottom: 86px; width: min(360px, calc(100vw - 28px)); height: 500px; z-index: 1100; display: block; opacity: 0; visibility: hidden; transition: all 0.2s; transition-delay: 0.1s; grid-template-rows: auto 1fr auto; background: rgba(15,17,27,.92); border: 1px solid rgba(148,163,184,.22); border-radius: 8px; box-shadow: 0 24px 80px rgba(0,0,0,.45); backdrop-filter: blur(18px); overflow: hidden; }
+        .live-support-panel.open { display: grid; }
+        .live-support-head { padding: 14px 16px; border-bottom: 1px solid rgba(148,163,184,.14); display:flex; justify-content:space-between; align-items:center; }
+        .live-support-messages { padding: 14px; overflow-y: auto; display:flex; flex-direction:column; gap:10px; }
+        .live-bubble { max-width: 82%; border-radius: 14px; padding: 9px 11px; font-size: .86rem; line-height: 1.35; }
+        .live-bubble.mine { margin-left:auto; background: linear-gradient(135deg, #2563eb, #7c3aed); color:#fff; }
+        .live-bubble.theirs { margin-right:auto; background: rgba(30,41,59,.88); color:#e5e7eb; border:1px solid rgba(148,163,184,.12); }
+        .live-support-form { display:flex; gap:8px; padding:12px; border-top:1px solid rgba(148,163,184,.14); }
+        .live-support-form input { flex:1; background:#0f172a; border:1px solid rgba(148,163,184,.22); color:#f8fafc; border-radius:8px; padding:10px; }
+        .live-support-form button { border:0; border-radius:8px; background:#6366f1; color:#fff; font-weight:800; padding:0 12px; }
+        .customer-ai-panel { position:fixed; left:22px; bottom:22px; width:min(340px, calc(100vw - 28px)); z-index:1090; background:rgba(15,17,27,.92); border:1px solid rgba(148,163,184,.22); border-radius:8px; box-shadow:0 20px 60px rgba(0,0,0,.42); backdrop-filter:blur(18px); overflow:hidden; display:none; }
+        .customer-ai-panel.open { display:block; }
+        .customer-ai-launcher { position:fixed; left:22px; bottom:22px; z-index:1091; border:0; border-radius:999px; color:#fff; font-weight:900; padding:12px 18px; background:linear-gradient(135deg,#06b6d4,#7c3aed); box-shadow:0 18px 44px rgba(6,182,212,.3); }
 
         /* ================================================================
            ALERTS / MESSAGES
@@ -359,9 +405,10 @@
         .text-secondary-custom { color: var(--text-secondary); }
 
         @media (max-width: 768px) {
-            .nexus-search { display: none; }
+            .nexus-search { display: block; opacity: 0; visibility: hidden; transition: all 0.2s; transition-delay: 0.1s; }
             .nexus-mobile-toggle { display: flex; }
-            .nexus-nav-links { display: none; }
+            .nexus-nav-links { display: block; opacity: 0; visibility: hidden; transition: all 0.2s; transition-delay: 0.1s; }
+            .footer-inner { grid-template-columns: 1fr; }
         }
     </style>
 
@@ -425,8 +472,8 @@
                     <i data-lucide="chevron-down" width="12" height="12"></i>
                 </a>
                 <div class="nexus-dropdown-menu">
-                    <a href="{% url 'store:profile' %}">
-                        <i data-lucide="user-circle" width="14" height="14" style="margin-right:6px;"></i>My Profile
+                    <a href="{% url 'store:account_dashboard' %}">
+                        <i data-lucide="layout-dashboard" width="14" height="14" style="margin-right:6px;"></i>My Dashboard
                     </a>
                     <a href="{% url 'store:cart_detail' %}">
                         <i data-lucide="shopping-cart" width="14" height="14" style="margin-right:6px;"></i>Cart ({{ cart|length }})
@@ -476,14 +523,47 @@
 
     <!-- Footer -->
     <footer class="nexus-footer">
-        <p>&copy; 2025
-            {% if current_tenant.schema_name == 'public' %}
-                <a href="/">NexusCommerce</a> — AI-Powered B2B Marketplace
-            {% else %}
-                {{ current_tenant.name }} on <a href="#">NexusCommerce</a>
-            {% endif %}
-            &nbsp;|&nbsp; Powered by <span class="gradient-text" style="font-weight:700;">KOBI-AI</span>
-        </p>
+        <div class="footer-inner">
+            <div>
+                <div class="footer-brand">
+                    {% if current_tenant.schema_name == 'public' %}NexusCommerce{% else %}{{ current_tenant.name }}{% endif %}
+                </div>
+                <p style="color:var(--text-secondary);max-width:360px;margin:0;">
+                    Premium B2B commerce infrastructure powered by tenant isolation, AI operations, and real-time marketplace intelligence.
+                </p>
+                <div class="footer-social">
+                    <a href="#" aria-label="LinkedIn"><i data-lucide="linkedin" width="16" height="16"></i></a>
+                    <a href="#" aria-label="Twitter"><i data-lucide="twitter" width="16" height="16"></i></a>
+                    <a href="#" aria-label="GitHub"><i data-lucide="github" width="16" height="16"></i></a>
+                </div>
+            </div>
+            <div class="footer-col">
+                <h3>Products</h3>
+                <a href="{% url 'store:product_list' %}">Catalog</a>
+                <a href="{% url 'store:search' %}">AI Search</a>
+                {% if current_tenant.schema_name == 'public' %}<a href="{% url 'store_management:register' %}">Open Store</a>{% endif %}
+            </div>
+            <div class="footer-col">
+                <h3>Account</h3>
+                {% if user.is_authenticated %}
+                    <a href="{% url 'store:account_dashboard' %}">Dashboard</a>
+                    <a href="{% url 'store:wishlist' %}">Wishlist</a>
+                    <a href="{% url 'store:logout' %}">Log Out</a>
+                {% else %}
+                    <a href="{% url 'store:login' %}">Log In</a>
+                    <a href="{% url 'store:signup' %}">Sign Up</a>
+                {% endif %}
+            </div>
+            <div class="footer-col">
+                <h3>Support</h3>
+                <a href="{% url 'store:cart_detail' %}">Cart</a>
+                <a href="{% url 'store:login' %}">Workspace Login</a>
+                <a href="mailto:support@nexuscommerce.ai">Contact</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            &copy; 2026 NexusCommerce. Powered by <span class="gradient-text" style="font-weight:800;">KOBI-AI</span>.
+        </div>
     </footer>
 
     <!-- Bootstrap JS -->
@@ -496,9 +576,104 @@
 
     {# KOBI-AI Chat Widget — src is set dynamically by master_launcher.py #}
     <script id="kobi-widget-script"
-            src="http://127.0.0.1:{{ ai_port|default:'8003' }}/static/kobi-widget.js"
+            src="{{ ai_service_base_url }}/static/kobi-widget.js"
             data-api-key="demo-tenant-key-123"
             defer></script>
 
+    {% if user.is_authenticated and current_tenant.schema_name != 'public' and not user.is_staff %}
+    <div id="live-support-panel" class="live-support-panel" data-poll-url="{% url 'store:live_support_poll' %}" data-send-url="{% url 'store:live_support_send' %}">
+        <div class="live-support-head">
+            <div>
+                <strong>Canlı Destek</strong>
+                <div style="font-size:.75rem;color:var(--text-secondary);">{{ current_tenant.name }}</div>
+            </div>
+            <button type="button" onclick="toggleLiveSupport()" style="background:none;border:0;color:#94a3b8;"><i data-lucide="x" width="18"></i></button>
+        </div>
+        <div id="live-support-messages" class="live-support-messages"></div>
+        <form id="live-support-form" class="live-support-form">
+            {% csrf_token %}
+            <input name="content" placeholder="Mesajınızı yazın..." autocomplete="off" required>
+            <button type="submit"><i data-lucide="send" width="16"></i></button>
+        </form>
+    </div>
+    <button type="button" class="live-support-launcher" onclick="toggleLiveSupport()">
+        <i data-lucide="message-circle" width="18"></i> Canlı Destek
+    </button>
+    <script>
+        const livePanel = document.getElementById('live-support-panel');
+        const liveMessages = document.getElementById('live-support-messages');
+        const liveForm = document.getElementById('live-support-form');
+        let liveLastId = 0;
+        function toggleLiveSupport() {
+            livePanel.classList.toggle('open');
+            if (livePanel.classList.contains('open')) pollLiveSupport(true);
+        }
+        function renderLiveMessage(msg) {
+            if (document.getElementById(`live-msg-${msg.id}`)) return;
+            const bubble = document.createElement('div');
+            bubble.id = `live-msg-${msg.id}`;
+            bubble.className = `live-bubble ${msg.mine ? 'mine' : 'theirs'}`;
+            bubble.innerHTML = `<div>${msg.content}</div><small style="opacity:.7">${msg.sender} · ${msg.timestamp}</small>`;
+            liveMessages.appendChild(bubble);
+            liveMessages.scrollTop = liveMessages.scrollHeight;
+            liveLastId = Math.max(liveLastId, msg.id);
+        }
+        async function pollLiveSupport(force=false) {
+            if (!livePanel || (!force && !livePanel.classList.contains('open'))) return;
+            const res = await fetch(`${livePanel.dataset.pollUrl}?after_id=${liveLastId}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            (data.messages || []).forEach(renderLiveMessage);
+        }
+        liveForm?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const input = liveForm.querySelector('input[name="content"]');
+            const body = new FormData(liveForm);
+            const res = await fetch(livePanel.dataset.sendUrl, { method: 'POST', body, headers: {'X-Requested-With': 'XMLHttpRequest'} });
+            if (res.ok) {
+                input.value = '';
+                const data = await res.json();
+                renderLiveMessage(data.message);
+            }
+        });
+        setInterval(() => pollLiveSupport(false), 2500);
+    </script>
+    {% endif %}
+    {% if current_tenant.schema_name != 'public' %}
+    <div id="customer-ai-panel" class="customer-ai-panel">
+        <div class="live-support-head">
+            <strong>AI Ürün Asistanı</strong>
+            <button type="button" onclick="document.getElementById('customer-ai-panel').classList.remove('open')" style="background:none;border:0;color:#94a3b8;"><i data-lucide="x" width="18"></i></button>
+        </div>
+        <div id="customer-ai-log" class="live-support-messages" style="height:240px;"></div>
+        <form id="customer-ai-form" class="live-support-form">
+            <input name="message" placeholder="En ucuz ürün ne?" autocomplete="off" required>
+            <button type="submit"><i data-lucide="send" width="16"></i></button>
+        </form>
+    </div>
+    <button type="button" class="customer-ai-launcher" onclick="document.getElementById('customer-ai-panel').classList.toggle('open')">
+        <i data-lucide="bot" width="18"></i> AI Asistan
+    </button>
+    <script>
+        document.getElementById('customer-ai-form')?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const input = event.currentTarget.querySelector('input[name="message"]');
+            const message = input.value.trim();
+            if (!message) return;
+            const log = document.getElementById('customer-ai-log');
+            log.innerHTML += `<div class="live-bubble mine">${message}</div>`;
+            input.value = '';
+            const context = await (await fetch("{% url 'store:customer_catalog_context' %}")).json();
+            const res = await fetch(`{{ ai_service_base_url }}/api/v1/customer-assistant/chat`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({store_slug: context.store, message, context})
+            });
+            const data = await res.json();
+            log.innerHTML += `<div class="live-bubble theirs">${data.answer}<br>${(data.products || []).map(p => `<a style="color:#93c5fd" href="${p.url}">${p.name} - ${p.price}</a>`).join('<br>')}</div>`;
+            log.scrollTop = log.scrollHeight;
+        });
+    </script>
+    {% endif %}
 </body>
 </html>

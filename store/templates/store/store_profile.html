@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .store-profile-hero { border:1px solid rgba(148,163,184,.16); border-radius:8px; background:rgba(15,17,27,.74); backdrop-filter:blur(18px); padding:2rem; margin-bottom:1.2rem; }
+    .store-profile-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:1rem; }
+    .store-product-card { border:1px solid rgba(148,163,184,.16); border-radius:8px; background:rgba(15,17,27,.74); backdrop-filter:blur(18px); overflow:hidden; text-decoration:none; color:#f8fafc; }
+    .store-product-card img { width:100%; height:180px; object-fit:cover; background:#111827; }
+    .store-product-card div { padding:1rem; }
+</style>
+<section class="store-profile-hero">
+    <div style="color:#67e8f9;font-size:.78rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;">Vendor Profile</div>
+    <h1 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:clamp(2rem,5vw,3.5rem);font-weight:900;">{{ store_name }}</h1>
+    <p style="color:#94a3b8;margin:0;">{{ product_count }} active products in this AI-powered storefront.</p>
+</section>
+<section class="store-profile-grid">
+    {% for variant in product_variants %}
+    <a class="store-product-card" href="{% url 'store:product_detail_variant' variant.product.slug variant.sku %}">
+        <img src="{% if variant.image %}{{ variant.image.url }}{% else %}https://placehold.co/600x400/111827/94a3b8?text={{ variant.product.name|urlencode }}{% endif %}" alt="{{ variant.product.name }}">
+        <div>
+            <strong>{{ variant.product.name }}</strong>
+            <p style="color:#94a3b8;margin:.35rem 0 0;">{{ variant.sale_price }} {{ variant.sale_currency }} · {{ variant.stock_quantity }} stock</p>
+        </div>
+    </a>
+    {% empty %}
+    <p style="color:#94a3b8;">This store has no active products yet.</p>
+    {% endfor %}
+</section>
+{% endblock %}

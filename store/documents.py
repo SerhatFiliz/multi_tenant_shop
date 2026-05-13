@@ -24,17 +24,31 @@ class ProductVariantDocument(Document):
     tenant_domain = fields.KeywordField()
 
     def prepare_tenant_name(self, instance):
-        # The schema_name is typically available via connection.tenant, but 
-        # since indexing might happen in background, let's look up the tenant.
+        # pyrefly: ignore [missing-import]
         from django.db import connection
+        from store.models import Tenant
         tenant = getattr(connection, 'tenant', None)
-        return tenant.name if tenant and tenant.schema_name != 'public' else 'Unknown'
+        if not tenant or tenant.schema_name == 'public':
+            return 'Unknown'
+            
+        if not hasattr(tenant, 'name'):
+            real_tenant = Tenant.objects.filter(schema_name=tenant.schema_name).first()
+            return real_tenant.name if real_tenant else 'Unknown'
+        return tenant.name
 
     def prepare_tenant_domain(self, instance):
         from django.db import connection
+        from store.models import Tenant
         tenant = getattr(connection, 'tenant', None)
-        if tenant and tenant.schema_name != 'public' and tenant.domains.exists():
-            return tenant.domains.first().domain
+        if not tenant or tenant.schema_name == 'public':
+            return 'localhost'
+            
+        real_tenant = tenant
+        if not hasattr(tenant, 'domains'):
+            real_tenant = Tenant.objects.filter(schema_name=tenant.schema_name).first()
+            
+        if real_tenant and hasattr(real_tenant, 'domains') and real_tenant.domains.exists():
+            return real_tenant.domains.first().domain
         return 'localhost'
 
     class Index:

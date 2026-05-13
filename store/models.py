@@ -5,6 +5,7 @@ from django.contrib.auth.models import AbstractUser, Group, Permission
 from django_tenants.models import TenantMixin, DomainMixin
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
 
 
 # ==============================================================================
@@ -19,6 +20,15 @@ class Tenant(TenantMixin):
     """
     name = models.CharField(max_length=100)
     created_on = models.DateField(auto_now_add=True)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="owned_tenants",
+    )
+    subdomain = models.SlugField(max_length=63, unique=True, null=True, blank=True)
+    target_profit_margin = models.DecimalField(max_digits=5, decimal_places=2, default=30)
     
     # New field added to enable admin approval for a store.
     # A store is not accessible until an admin sets this field to True.
@@ -26,7 +36,7 @@ class Tenant(TenantMixin):
     
     # We set auto_create_schema to False because we will handle this manually
     # or rely on the management commands to create schemas for new tenants.
-    auto_create_schema = False
+    auto_create_schema = True
 
     def __str__(self):
         return self.name
@@ -72,8 +82,45 @@ class User(AbstractUser):
         related_name="store_user_permissions_set",
         related_query_name="user",
     )
-    # We can add extra fields here later if we want.
-    pass
+    ROLE_ADMIN = "admin"
+    ROLE_EDITOR = "editor"
+    ROLE_SUPPORT = "support"
+    ROLE_CUSTOMER = "customer"
+    ROLE_CHOICES = (
+        (ROLE_ADMIN, "Admin"),
+        (ROLE_EDITOR, "Editor"),
+        (ROLE_SUPPORT, "Support"),
+        (ROLE_CUSTOMER, "Customer"),
+    )
+    tenant_role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_CUSTOMER)
+
+    @property
+    def can_manage_products(self):
+        return self.is_superuser or self.tenant_role in {self.ROLE_ADMIN, self.ROLE_EDITOR}
+
+    @property
+    def can_manage_orders(self):
+        return self.is_superuser or self.tenant_role in {self.ROLE_ADMIN, self.ROLE_SUPPORT}
+
+    @property
+    def can_invite_users(self):
+        return self.is_superuser or self.tenant_role == self.ROLE_ADMIN
+
+
+class TenantInvitation(models.Model):
+    email = models.EmailField()
+    role = models.CharField(max_length=20, choices=User.ROLE_CHOICES)
+    invited_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="sent_invites")
+    token = models.CharField(max_length=64, unique=True)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def mark_accepted(self):
+        self.accepted_at = timezone.now()
+        self.save(update_fields=["accepted_at"])
 
 
 class Address(models.Model):
@@ -117,6 +164,7 @@ class Product(models.Model):
     Represents a main product, which can have multiple variations.
     e.g., '10mm Crystal Bead'
     """
+    store = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="products", null=True, blank=True)
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name='products')
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
@@ -124,6 +172,10 @@ class Product(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def total_stock(self):
+        return sum(variant.stock_quantity for variant in self.variants.all())
 
     def __str__(self):
         return self.name
@@ -139,6 +191,7 @@ class ProductVariant(models.Model):
     color = models.CharField(max_length=50, blank=True, null=True)
     size = models.CharField(max_length=50, blank=True, null=True)
     sale_price = models.DecimalField(max_digits=10, decimal_places=2)
+    sale_currency = models.CharField(max_length=3, default="TRY")
     stock_quantity = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
@@ -149,16 +202,36 @@ class ProductVariant(models.Model):
     # NEW FIELD: This field will store the cost of the product variant.
     # It's crucial for calculating profit and loss later in the dashboard.
     cost_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cost_currency = models.CharField(max_length=3, default="TRY")
 
     def __str__(self):
         return f"{self.product.name} ({self.color or ''} {self.size or ''}) - SKU: {self.sku}"
 
-# --- Order Management Models ---
 
-# multi_tenant_shop/store/models.py
-from django.db import models
-from django.conf import settings
-from .models import Product, ProductVariant
+class ProductPriceHistory(models.Model):
+    product_variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, related_name="price_history")
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, default="TRY")
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["changed_at"]
+        indexes = [models.Index(fields=["product_variant", "changed_at"])]
+
+    def __str__(self):
+        return f"{self.product_variant.sku} {self.price} {self.currency} @ {self.changed_at:%Y-%m-%d}"
+
+
+class ExchangeRateCache(models.Model):
+    base_currency = models.CharField(max_length=3, default="USD")
+    quote_currency = models.CharField(max_length=3)
+    rate = models.DecimalField(max_digits=18, decimal_places=6)
+    fetched_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("base_currency", "quote_currency")
+
+# --- Order Management Models ---
 
 class Order(models.Model):
     """
@@ -171,11 +244,14 @@ class Order(models.Model):
         ('delivered', 'Delivered'),
         ('cancelled', 'Cancelled'),
     )
+    store = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="orders", null=True, blank=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     shipping_address = models.ForeignKey(Address, on_delete=models.SET_NULL, null=True, blank=True)
     order_date = models.DateTimeField(auto_now_add=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, default="TRY")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    stripe_payment_intent_id = models.CharField(max_length=255, blank=True, null=True, unique=True)
     
     # New field:
     # This boolean field indicates whether the payment for the order has been successfully completed.
@@ -235,6 +311,32 @@ class Review(models.Model):
     
     def __str__(self):
         return f'Review by {self.user.username} for {self.product.name}'
+
+
+class Message(models.Model):
+    """
+    Stores direct customer-to-store conversations.
+    Sentiment fields are populated by the SaaS AI Brain webhook when available.
+    """
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sent_messages")
+    receiver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="received_messages")
+    store = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="messages")
+    content = models.TextField()
+    is_read = models.BooleanField(default=False)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    sentiment = models.CharField(max_length=40, default="Neutral")
+    is_high_priority = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-timestamp"]
+        indexes = [
+            models.Index(fields=["store", "timestamp"]),
+            models.Index(fields=["receiver", "is_read"]),
+            models.Index(fields=["is_high_priority"]),
+        ]
+
+    def __str__(self):
+        return f"{self.sender} -> {self.receiver}: {self.content[:40]}"
 
 # --- Inventory & Profitability Models (for future use) ---
 # These models lay the groundwork for tracking purchase costs and calculating profit.
@@ -296,6 +398,8 @@ class StoreSettings(models.Model):
     Settings specific to a tenant store.
     """
     live_chat_override = models.BooleanField(default=False, help_text="Bypass AI agent and route to live human agent")
+    local_currency = models.CharField(max_length=3, default="TRY")
+    target_profit_margin = models.DecimalField(max_digits=5, decimal_places=2, default=30)
 
     def __str__(self):
         return f"Store Settings (Live Chat Override: {self.live_chat_override})"

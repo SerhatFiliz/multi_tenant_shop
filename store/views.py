@@ -1,7 +1,8 @@
 # multi_tenant_shop/store/views.py
 
-from django.views.generic import TemplateView, ListView, DetailView 
-from .models import Product, ProductVariant, Order, OrderItem, Review, Address, Category, Wishlist
+from django.views.generic import TemplateView, ListView, DetailView
+from django.contrib.auth.views import LoginView
+from .models import Product, ProductVariant, Order, OrderItem, Review, Address, Category, Wishlist, Message, User, Domain
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
@@ -31,14 +32,23 @@ import stripe
 from django.conf import settings
 
 from .tasks import send_order_confirmation_email, notify_saas_ai_brain
+from apps.finance.services import (
+    build_stripe_payment_intent,
+    create_order_from_cart,
+)
+from apps.marketplace.services import MarketplaceFxDisplayService, PriceHistoryService
 
 from django.http import JsonResponse
 import json
+import urllib.error
+import urllib.request
+from decimal import Decimal
 
-from django.db.models import Avg
+from django.db.models import Avg, Q
 from django.contrib import messages
 from django.http import Http404, HttpResponseRedirect
 from django.urls import reverse
+from django.utils import timezone
 
 from .models import Product, ProductVariant, Review, Order
 from .forms import ReviewForm
@@ -58,6 +68,65 @@ class HomePageView(TemplateView):
     """
     template_name = "home.html"
 
+
+class UniversalLoginView(LoginView):
+    template_name = "store/login.html"
+
+    def _is_public_workspace_login(self):
+        return getattr(self.request.tenant, "schema_name", "public") == "public"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["workspace_mode"] = self._is_public_workspace_login()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        if self._is_public_workspace_login() and request.POST.get("login_mode") == "workspace":
+            workspace = (request.POST.get("workspace") or "").strip().lower()
+            workspace = workspace.replace("http://", "").replace("https://", "").split("/")[0].split(":")[0]
+            workspace_hyphen = workspace.replace("_", "-")
+            workspace_schema = workspace.replace("-", "_")
+            workspace_plain = workspace.replace("-", "").replace("_", "")
+            if not workspace:
+                messages.error(request, "Please enter your workspace name.")
+                return redirect("store:login")
+
+            tenant = Tenant.objects.filter(
+                Q(subdomain__in=[workspace_hyphen, workspace_schema, workspace_plain])
+                | Q(schema_name__in=[workspace_hyphen, workspace_schema, workspace_plain])
+            ).first()
+
+            if not tenant:
+                domain_names = {
+                    f"{workspace_hyphen}.localhost",
+                    f"{workspace_schema}.localhost",
+                    f"{workspace_plain}.localhost",
+                    f"{workspace_hyphen}.nexus.com",
+                    f"{workspace_schema}.nexus.com",
+                    f"{workspace_plain}.nexus.com",
+                }
+                domain = Domain.objects.select_related("tenant").filter(domain__in=domain_names).first()
+                tenant = domain.tenant if domain else None
+
+            if not tenant:
+                messages.error(request, "Workspace not found. Check the name and try again.")
+                return redirect("store:login")
+
+            workspace_host = tenant.subdomain or tenant.schema_name.replace("_", "-")
+            current_port = request.META.get("SERVER_PORT", "8000")
+            return redirect(f"http://{workspace_host}.localhost:{current_port}/login/")
+
+        return super().post(request, *args, **kwargs)
+
+    def get_success_url(self):
+        user = self.request.user
+        if user.is_superuser:
+            return "/admin/"
+        if user.is_staff or getattr(user, "tenant_role", None) in {User.ROLE_ADMIN, User.ROLE_EDITOR, User.ROLE_SUPPORT}:
+            return "/nexus/dashboard/"
+        return "/account/dashboard/"
+
+
 from django_tenants.utils import schema_context
 from store.models import Tenant, ProductVariant
 
@@ -68,13 +137,11 @@ class MarketplaceHomeView(TemplateView):
         context = super().get_context_data(**kwargs)
         all_products = []
         for tenant in Tenant.objects.exclude(schema_name='public'):
-            with schema_context(tenant.schema_name):
-                # Fetch top 8 active variants per tenant
-                variants = list(ProductVariant.objects.filter(is_active=True).select_related('product')[:8])
-                for v in variants:
-                    v.tenant_domain = tenant.domains.first().domain if tenant.domains.exists() else None
-                    v.tenant_name = tenant.name
-                    all_products.append(v)
+            variants = list(ProductVariant.objects.filter(product__store=tenant, is_active=True).select_related('product')[:8])
+            for v in variants:
+                v.tenant_domain = tenant.domains.first().domain if tenant.domains.exists() else None
+                v.tenant_name = tenant.name
+                all_products.append(v)
         # Sort or shuffle if needed, for now just slice top 24
         context['global_products'] = all_products[:24]
         return context
@@ -103,7 +170,7 @@ class ProductListView(ListView):
         # Start by querying the ProductVariant model. `select_related('product')`
         # fetches the related Product for each variant in a single query,
         # preventing the N+1 query problem.
-        queryset = ProductVariant.objects.filter(is_active=True).select_related('product')
+        queryset = ProductVariant.objects.filter(product__store=self.request.tenant, is_active=True).select_related('product')
         
         # --- Filtering Logic ---
         
@@ -170,7 +237,7 @@ class ProductDetailView(DetailView):
         Retrieves the main Product object based on the slug.
         This method is critical for Django's DetailView.
         """
-        return get_object_or_404(Product, slug=self.kwargs['slug'])
+        return get_object_or_404(Product, slug=self.kwargs['slug'], store=self.request.tenant)
 
     def get_context_data(self, **kwargs):
         """
@@ -200,6 +267,9 @@ class ProductDetailView(DetailView):
                 pass 
         
         context['initial_variant'] = initial_variant
+        if initial_variant:
+            context.update(PriceHistoryService.chart_context(initial_variant))
+            context["fx_equivalents"] = MarketplaceFxDisplayService.equivalents_for_try_price(initial_variant.sale_price)
 
         # --- Variant Data for JavaScript ---
         # It's good practice to pass data for JS separately.
@@ -222,12 +292,168 @@ class ProductDetailView(DetailView):
             # Check if the user has purchased this product and the order is delivered or shipped.
             has_purchased = Order.objects.filter(
                 user=self.request.user,
+                store=self.request.tenant,
                 status__in=['delivered', 'shipped'],
                 items__product_variant__product=product
             ).exists()
         context['has_purchased'] = has_purchased
+        tenant = getattr(self.request, "tenant", None)
+        context["store_slug"] = getattr(tenant, "subdomain", None) or getattr(tenant, "schema_name", "").replace("_", "-")
+        context["store_name"] = getattr(tenant, "name", "Store")
 
         return context
+
+
+class StoreProfileView(TemplateView):
+    template_name = "store/store_profile.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        tenant = self.request.tenant
+        variants = ProductVariant.objects.filter(product__store=tenant, is_active=True).select_related("product", "product__category").order_by("product__name")
+        context.update(
+            {
+                "store_name": tenant.name,
+                "store_slug": getattr(tenant, "subdomain", None) or tenant.schema_name.replace("_", "-"),
+                "product_variants": variants,
+                "product_count": variants.count(),
+            }
+        )
+        return context
+
+
+def _fallback_message_analysis(content):
+    urgent_terms = [
+        "urgent", "angry", "mad", "immediately", "refund", "late", "delayed", "lost",
+        "acil", "kızgın", "kizgin", "hemen", "iade", "gecikti", "kayboldu", "şikayet", "sikayet",
+    ]
+    lowered = content.lower()
+    is_high_priority = any(term in lowered for term in urgent_terms)
+    return {
+        "sentiment": "Angry/Urgent" if is_high_priority else "Neutral",
+        "is_high_priority": is_high_priority,
+    }
+
+
+def _analyze_message_with_ai(message):
+    payload = {
+        "message_id": message.id,
+        "store_id": getattr(message.store, "schema_name", "public"),
+        "sender_email": message.sender.email,
+        "content": message.content,
+    }
+    data = json.dumps(payload).encode("utf-8")
+    endpoint = getattr(settings, "AI_MESSAGE_WEBHOOK_URL", "http://127.0.0.1:8002/api/v1/webhooks/message-sent")
+    api_key = getattr(settings, "SAAS_API_KEY", "demo-tenant-key-123")
+    request = urllib.request.Request(
+        endpoint,
+        data=data,
+        method="POST",
+        headers={"Content-Type": "application/json", "X-API-KEY": api_key},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=2) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+        result = _fallback_message_analysis(message.content)
+
+    message.sentiment = result.get("sentiment", "Neutral")
+    message.is_high_priority = bool(result.get("is_high_priority", False))
+    message.save(update_fields=["sentiment", "is_high_priority"])
+
+
+def _store_receiver_for_message(request):
+    manager = User.objects.filter(is_staff=True).order_by("id").first()
+    if manager:
+        return manager
+    return User.objects.exclude(id=request.user.id).order_by("id").first()
+
+
+def _message_payload(message, current_user):
+    return {
+        "id": message.id,
+        "content": message.content,
+        "sender": message.sender.email or message.sender.username,
+        "receiver": message.receiver.email or message.receiver.username,
+        "mine": message.sender_id == current_user.id,
+        "timestamp": message.timestamp.strftime("%H:%M"),
+        "is_high_priority": message.is_high_priority,
+        "sentiment": message.sentiment,
+    }
+
+
+@login_required
+@require_POST
+def send_store_message(request):
+    content = (request.POST.get("content") or "").strip()
+    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or reverse("store:home")
+    if not content:
+        messages.error(request, "Mesaj alanı boş bırakılamaz.")
+        return redirect(next_url)
+
+    receiver = _store_receiver_for_message(request)
+    if not receiver:
+        messages.error(request, "Mağaza ekibi şu anda mesaj alamıyor.")
+        return redirect(next_url)
+
+    message = Message.objects.create(
+        sender=request.user,
+        receiver=receiver,
+        store=request.tenant,
+        content=content,
+    )
+    _analyze_message_with_ai(message)
+    messages.success(request, "Mesajınız mağaza ekibine iletildi.")
+    return redirect(next_url)
+
+
+@login_required
+@require_POST
+def live_support_send(request):
+    content = (request.POST.get("content") or "").strip()
+    if not content:
+        return JsonResponse({"error": "Message cannot be empty."}, status=400)
+    receiver = _store_receiver_for_message(request)
+    if not receiver:
+        return JsonResponse({"error": "No store manager is available."}, status=404)
+    message = Message.objects.create(
+        sender=request.user,
+        receiver=receiver,
+        store=request.tenant,
+        content=content,
+    )
+    _analyze_message_with_ai(message)
+    return JsonResponse({"message": _message_payload(message, request.user)})
+
+
+@login_required
+def live_support_poll(request):
+    after_id = int(request.GET.get("after_id") or 0)
+    qs = Message.objects.filter(store=request.tenant, id__gt=after_id).select_related("sender", "receiver").order_by("id")
+    if not request.user.is_staff:
+        qs = qs.filter(Q(sender=request.user) | Q(receiver=request.user))
+    return JsonResponse({"messages": [_message_payload(message, request.user) for message in qs[:50]]})
+
+
+def customer_catalog_context(request):
+    variants = ProductVariant.objects.filter(product__store=request.tenant, is_active=True).select_related("product", "product__category")
+    return JsonResponse(
+        {
+            "store": getattr(request.tenant, "subdomain", None) or request.tenant.schema_name,
+            "products": [
+                {
+                    "id": variant.product.id,
+                    "variant_id": variant.id,
+                    "name": variant.product.name,
+                    "category": variant.product.category.name,
+                    "price": float(variant.sale_price),
+                    "stock": variant.stock_quantity,
+                    "url": reverse("store:product_detail", kwargs={"slug": variant.product.slug}),
+                }
+                for variant in variants
+            ],
+        }
+    )
 
     
 @require_POST
@@ -236,7 +462,12 @@ def cart_add(request, variant_id):
     A view to add a product variant to the cart.
     """
     cart = Cart(request)
-    variant = get_object_or_404(ProductVariant, id=variant_id)
+    variant = get_object_or_404(ProductVariant, id=variant_id, product__store=request.tenant)
+    
+    if variant.stock_quantity <= 0:
+        messages.error(request, "Out of Stock: Cannot add item to cart.")
+        return redirect('store:product_detail_variant', slug=variant.product.slug, sku=variant.sku)
+        
     # For simplicity, we add quantity 1 for now. We will enhance this later.
     cart.add(variant=variant, quantity=1)
     return redirect('store:cart_detail') # Redirect to the cart detail page
@@ -304,30 +535,28 @@ def checkout(request):
             # Now, save the complete Address object to the database.
             address.save()
 
-            # Create the main Order object in the database.
-            # Simulated Stripe payment success
-            order = Order.objects.create(
-                user=request.user,
-                shipping_address=address,
-                total_amount=cart.get_total_price(),
-                paid=True,
-                status='processing'
-            )
-
-            # Loop through every item in the cart to create individual OrderItem records.
-            for item in cart:
-                OrderItem.objects.create(
-                    order=order,
-                    product_variant=item['variant'],
-                    price=item['price'],
-                    quantity=item['quantity']
+            try:
+                payment_intent_id = request.POST.get("payment_intent_id")
+                if not payment_intent_id:
+                    raise ValueError("Payment could not be verified. Please try again.")
+                order_items_snapshot = [
+                    {
+                        "sku": item["variant"].sku,
+                        "name": item["variant"].product.name,
+                        "quantity": item["quantity"],
+                        "price": str(item["price"]),
+                    }
+                    for item in cart
+                ]
+                order = create_order_from_cart(
+                    user=request.user,
+                    address=address,
+                    cart=cart,
+                    payment_intent_id=payment_intent_id,
                 )
-                
-                # Reduce stock in DB
-                variant = item['variant']
-                if variant.stock_quantity >= item['quantity']:
-                    variant.stock_quantity -= item['quantity']
-                    variant.save()
+            except ValueError as e:
+                messages.error(request, str(e))
+                return redirect('store:cart_detail')
             
             # The order is successfully created, so clear the user's cart from the session.
             cart.clear()
@@ -335,15 +564,6 @@ def checkout(request):
             # --- Notify the KOBİ SaaS AI Brain asynchronously ---
             # Build a lightweight, serialisable snapshot of the order so the
             # Celery worker does not need a live DB connection on the AI side.
-            order_items_snapshot = [
-                {
-                    "sku":      item["variant"].sku,
-                    "name":     item["variant"].product.name,
-                    "quantity": item["quantity"],
-                    "price":    str(item["price"]),
-                }
-                for item in cart  # cart was already iterated above; re-iterate for snapshot
-            ]
             order_data_payload = {
                 "order_id":     order.id,
                 "total_amount": str(order.total_amount),
@@ -372,11 +592,9 @@ def checkout(request):
             try:
                 # Create a PaymentIntent object on Stripe's servers.
                 # This object represents the payment session and contains the client_secret.
-                intent = stripe.PaymentIntent.create(
-                    amount=int(cart.get_total_price() * 100), # Amount must be in the smallest currency unit (e.g., cents).
-                    currency='try',
-                    automatic_payment_methods={'enabled': True},
-                    # metadata={'order_id': order.id} # Link this intent to our new order
+                intent = build_stripe_payment_intent(
+                    amount=cart.get_total_price(),
+                    metadata={"user_id": request.user.id, "tenant": getattr(request.tenant, "schema_name", "public")},
                 )
             except stripe.error.StripeError as e:
                 # If Stripe returns an error, display it to the user.
@@ -395,6 +613,7 @@ def checkout(request):
     # Render the checkout page template with the prepared context.
     return render(request, 'store/checkout.html', context)
 
+
 def signup(request):
     if request.method == 'POST':
         # If the form is submitted, create a form instance with the POST data.
@@ -412,18 +631,35 @@ def signup(request):
 
     return render(request, 'store/signup.html', {'form': form})
 
+
+@require_POST
+def magic_link_request(request):
+    email = (request.POST.get("email") or "").strip()
+    if not email:
+        messages.error(request, "Please enter an email address for your magic link.")
+    else:
+        messages.success(request, "Magic link sent to your email!")
+    return redirect("store:login")
+
 # The @login_required decorator is a security feature from Django.
 # It ensures that only logged-in users can access this view.
 # If an anonymous user tries to access it, they will be redirected to the login page.
 @login_required
 def profile(request):
-    orders = Order.objects.filter(user=request.user).order_by('-order_date')
+    orders = Order.objects.filter(user=request.user, store=request.tenant).prefetch_related("items__product_variant__product").order_by('-order_date')
     addresses = Address.objects.filter(user=request.user)
+    active_orders = orders.exclude(status__in=["delivered", "cancelled"])
+    order_history = orders.filter(status__in=["delivered", "cancelled"])
+    wishlist, _ = Wishlist.objects.get_or_create(user=request.user)
+    customer_messages = Message.objects.filter(store=request.tenant).filter(Q(sender=request.user) | Q(receiver=request.user)).select_related("sender", "receiver", "store")[:8]
 
-    # --- UPDATE THE CONTEXT ---
     context = {
         'orders': orders,
-        'addresses': addresses
+        'active_orders': active_orders,
+        'order_history': order_history,
+        'addresses': addresses,
+        'wishlist': wishlist,
+        'customer_messages': customer_messages,
     }
     return render(request, 'store/profile.html', context)
 
@@ -434,11 +670,12 @@ def submit_review(request, slug):
     Only allows users who have a paid order for the product to submit a review.
     """
     # Find the product that the user is trying to review.
-    product = get_object_or_404(Product, slug=slug)
+    product = get_object_or_404(Product, slug=slug, store=request.tenant)
 
     # Check if the user has purchased this product and if the order is paid.
     has_purchased = OrderItem.objects.filter(
         order__user=request.user,
+        order__store=request.tenant,
         product_variant__product=product,
         order__paid=True
     ).exists()
@@ -576,9 +813,11 @@ class ProductViewSet(viewsets.ModelViewSet):
     This ViewSet now provides full 'list', 'create', 'retrieve',
     'update', and 'destroy' actions for Products.
     """
-    queryset = Product.objects.filter(is_active=True)
     serializer_class = ProductSerializer
     lookup_field = 'slug'
+
+    def get_queryset(self):
+        return Product.objects.filter(store=self.request.tenant, is_active=True)
 
 class CategoryViewSet(viewsets.ModelViewSet):
     """
@@ -618,7 +857,7 @@ class UserOrderHistoryView(generics.ListAPIView):
         Returns the orders placed by the currently authenticated user.
         """
         user = self.request.user
-        return Order.objects.filter(user=user).order_by('-order_date')
+        return Order.objects.filter(user=user, store=self.request.tenant).order_by('-order_date')
 
 
 class AddressViewSet(viewsets.ModelViewSet):
@@ -663,7 +902,7 @@ class ProductReviewListView(generics.ListAPIView):
         The 'product_id' is passed from the URL.
         """
         product_id = self.kwargs['product_id']
-        return Review.objects.filter(product_id=product_id)
+        return Review.objects.filter(product_id=product_id, product__store=self.request.tenant)
 
 
 class ProductReviewCreateView(generics.CreateAPIView):
@@ -680,7 +919,7 @@ class ProductReviewCreateView(generics.CreateAPIView):
         Creates a new review, linking it to the authenticated user and the product from the URL.
         """
         product_id = self.kwargs['product_id']
-        product = Product.objects.get(id=product_id)
+        product = Product.objects.get(id=product_id, store=self.request.tenant)
         serializer.save(user=self.request.user, product=product)
 
 # ==============================================================================
@@ -708,7 +947,7 @@ def cart_update_api(request):
         if not variant_id or quantity < 1:
             return JsonResponse({'error': 'Invalid data'}, status=400)
 
-        variant = get_object_or_404(ProductVariant, id=variant_id)
+        variant = get_object_or_404(ProductVariant, id=variant_id, product__store=request.tenant)
         # `override_quantity` replaces the existing item quantity.
         cart.add(variant=variant, quantity=quantity, override_quantity=True)
 
@@ -744,7 +983,7 @@ def cart_remove_api(request):
         if not variant_id:
             return JsonResponse({'error': 'Invalid data'}, status=400)
 
-        variant = get_object_or_404(ProductVariant, id=variant_id)
+        variant = get_object_or_404(ProductVariant, id=variant_id, product__store=request.tenant)
         cart.remove(variant)
 
         # The response data includes the updated cart totals.
@@ -784,7 +1023,7 @@ def add_to_wishlist(request, slug):
     Adds a product to the user's wishlist using the ManyToMany relationship.
     It checks if the product is already in the wishlist before adding it.
     """
-    product = get_object_or_404(Product, slug=slug)
+    product = get_object_or_404(Product, slug=slug, store=request.tenant)
     
     # Get or create the user's single wishlist object.
     # `get_or_create` is an atomic operation and handles race conditions.
@@ -804,11 +1043,12 @@ def add_to_wishlist(request, slug):
 
 @login_required
 def submit_review(request, slug):
-    product = get_object_or_404(Product, slug=slug)
+    product = get_object_or_404(Product, slug=slug, store=request.tenant)
 
     # Check if the user has purchased this product and if the order is paid.
     has_purchased = OrderItem.objects.filter(
         order__user=request.user,
+        order__store=request.tenant,
         product_variant__product=product,
         order__paid=True
     ).exists()
@@ -844,4 +1084,3 @@ def submit_review(request, slug):
         'product': product,
     }
     return render(request, 'store/submit_review.html', context)
-
