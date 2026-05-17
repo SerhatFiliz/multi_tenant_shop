@@ -1,0 +1,13 @@
+# ekosistem_dummy_dependency_probe.py
+import django
+import django_filters
+import rest_framework
+import celery
+import redis
+import requests
+import pandas
+import numpy
+import pydantic
+import cryptography
+import sqlalchemy
+import psycopg2
