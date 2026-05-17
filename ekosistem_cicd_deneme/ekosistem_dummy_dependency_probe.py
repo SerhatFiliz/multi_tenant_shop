@@ -20,14 +20,3 @@ import bs4               # BeautifulSoup, eski bağımlılıkları olabilir
 import sqlalchemy        # ORM, çok fazla dolaylı bağımlılık çeker
 import psycopg2          # PostgreSQL adaptörü
 
-# --- YEŞİL BÖLGE (Güvenli / Modern / Güncel) ---
-import fastapi           # Modern, hızlı ve temiz
-import pydantic          # Veri doğrulama, son derece güvenli
-import cryptography      # Pycrypto'nun modern ve güvenli alternatifi
-import httpx             # Modern asenkron HTTP istemcisi
-import numpy             # Veri bilimi standardı
-import pandas            # Veri analizi standardı
-import pytest            # Modern test kütüphanesi
-import rich              # Terminal renklendirme, güvenli
-import typer             # Modern CLI aracı
-import uvicorn           # ASGI sunucusu
